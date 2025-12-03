@@ -7,7 +7,7 @@ import java.net.ConnectException;
 public class ClienteMulti {
     
     public static void main(String[] args) {
-        String host = "10.22.13.191";
+        String host = "localhost";
         int puerto = 8081;
         long tiempoEspera = 10000; // 10 segundos
 
