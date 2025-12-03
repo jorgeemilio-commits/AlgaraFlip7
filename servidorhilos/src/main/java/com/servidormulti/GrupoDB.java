@@ -152,12 +152,12 @@ public class GrupoDB {
     }
     
     /**
-     * Obtiene una lista de los nombres de todos los grupos/salas.
+     * Obtiene una lista de los nombres de grupos, ORDENADOS por ID.
      */
     public List<String> obtenerNombresDeGrupos() {
         List<String> nombres = new ArrayList<>();
-        // Excluye el grupo "Todos"
-        String sql = "SELECT nombre FROM grupos WHERE nombre != 'Todos'"; 
+        // ORDER BY id para que los números del menú no cambien
+        String sql = "SELECT nombre FROM grupos WHERE nombre != 'Todos' ORDER BY id ASC"; 
         Connection conn = ConexionDB.conectar();
         if (conn == null) return nombres;
         
