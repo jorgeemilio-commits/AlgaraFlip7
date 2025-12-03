@@ -1,4 +1,3 @@
-// servidorhilos/src/main/java/com/servidormulti/ManejadorAutenticacion.java
 package com.servidormulti;
 
 import java.io.DataInputStream;
@@ -6,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Map; 
 import java.text.Normalizer; 
+import com.servidormulti.EstadoMenu;
 
 public class ManejadorAutenticacion {
 
@@ -15,20 +15,18 @@ public class ManejadorAutenticacion {
         this.clientesConectados = clientes;
     }
     
-    // NOTA: Los métodos manejarRegistro y manejarLogin (antiguos síncronos) han sido eliminados.
-
-    // --- MÉTODOS DE REGISTRO POR MENÚ (3 PASOS) ---
+    // --- MÉTODOS DE REGISTRO POR MENÚ ---
 
     public void manejarRegistroPorMenu_Paso1(String nombre, DataOutputStream salida, UnCliente cliente) throws IOException {
         
-        // 1. Validar nombre
+        // Validar nombre de usuario
         if (nombre.matches("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]+")) {
             salida.writeUTF("Error: El nombre de usuario contiene caracteres no permitidos. Solo se permiten letras, números y acentos.");
             cliente.mostrarMenuPrincipal(); 
             return;
         }
         
-        // 2. Guardar y pasar al siguiente estado
+        // Lo guarda temporalmente
         cliente.establecerNombreTemporal(nombre);
         cliente.establecerEstadoActual(EstadoMenu.REGISTRO_PEDIR_CONTRASENA); 
         salida.writeUTF("Introduce tu contraseña:");
@@ -36,7 +34,7 @@ public class ManejadorAutenticacion {
     
     public void manejarRegistroPorMenu_Paso2(String password, DataOutputStream salida, UnCliente cliente) throws IOException {
         
-        // 1. Guardar y pasar al siguiente estado
+        // Lo guarda temporalmente
         cliente.establecerContrasenaTemporal(password);
         cliente.establecerEstadoActual(EstadoMenu.REGISTRO_PEDIR_CONFIRMACION); 
         salida.writeUTF("Confirma tu contraseña:");
@@ -46,7 +44,7 @@ public class ManejadorAutenticacion {
         String nombre = cliente.obtenerNombreTemporal();
         String password = cliente.obtenerContrasenaTemporal();
         
-        // 1. Validar la confirmación
+        // Validar confirmación de contraseña
         if (!password.equals(confirmPassword)) {
             salida.writeUTF("Las contraseñas no coinciden. Registro cancelado.");
             cliente.limpiarTemporales();
@@ -54,16 +52,15 @@ public class ManejadorAutenticacion {
             return;
         }
         
-        // 2. Ejecutar el registro real
+        // Proceder con el registro del usuario
         Registrar registrar = new Registrar();
         String resultado = registrar.registrarUsuario(nombre, password);
         salida.writeUTF(resultado);
         
+        // Limpiar datos temporales
         cliente.limpiarTemporales(); 
         
-        // 3. Manejar el resultado
         if (resultado.contains("Registro exitoso")) {
-            // Intentar login automático
             if (manejarInicioSesionInternoPorMenu(nombre, password, salida, cliente)) { 
                 salida.writeUTF("Registro exitoso e inicio de sesión automático. Tu nuevo nombre es: " + cliente.getNombreUsuario());
                 cliente.mostrarMenuChat();
@@ -77,47 +74,42 @@ public class ManejadorAutenticacion {
     }
 
 
-    // --- MÉTODO DE LOGIN POR MENÚ (Llamado en el último paso de inicio de sesión o registro) ---
+    // --- MÉTODO DE LOGIN POR MENÚ ---
     
-    /**
-     * Maneja el login verificando credenciales, concurrencia y estableciendo el estado.
-     * @param nombre Nombre de usuario.
-     */
     public boolean manejarInicioSesionInternoPorMenu(String nombre, String password, DataOutputStream salida, UnCliente cliente) throws IOException {
         
+        // No se dio el nombre
         if (nombre == null || nombre.isEmpty()) {
             salida.writeUTF("Error: El nombre de usuario no fue proporcionado. Volviendo al menú principal.");
             return false;
         }
 
-        // Normalizar también en el login para coherencia con el registro
+        // Normalizar nombre de usuario
         nombre = Normalizer.normalize(nombre, Normalizer.Form.NFC);
 
-        // 1. Verificar si este cliente YA está logueado
+        // Verificar si el cliente ya está logueado
         if (cliente.estaLogueado()) {
             salida.writeUTF("Error: Ya has iniciado sesión como '" + cliente.getNombreUsuario() + "'.");
             return false;
         }
 
-        // 2. Verificar credenciales 
+        // Verificar credenciales en la base de datos
         Login login = new Login(); 
         if (!login.iniciarSesion(nombre, password)) {
             salida.writeUTF("Credenciales incorrectas. Intenta de nuevo.");
             return false;
         }
 
-        // 3. Buscar si alguien ya usa ese nombre
+        // Verificar si el usuario ya está conectado en otra sesión
         for (UnCliente clienteActivo : clientesConectados.values()) {
-            // Se debe revisar por el ID ya que el nombre de invitado puede coincidir con un nombre real.
             if (!clienteActivo.clienteID.equals(cliente.clienteID) &&
                 clienteActivo.getNombreUsuario().equalsIgnoreCase(nombre)) {
-                // Rechazar el login
                 salida.writeUTF("Error: El usuario '" + nombre + "' ya está conectado en otra sesión.");
                 return false;
             }
         }
 
-        // 4. Proceder con el login
+        // Manejar el inicio de sesión
         if (cliente.manejarLoginInterno(nombre, password)) { 
             salida.writeUTF("Inicio de sesión exitoso. Tu nuevo nombre es: " + cliente.getNombreUsuario() + ". Ahora puedes enviar mensajes sin límite.");
             return true;

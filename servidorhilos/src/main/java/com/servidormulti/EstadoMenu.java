@@ -7,5 +7,5 @@ public enum EstadoMenu {
     REGISTRO_PEDIR_NOMBRE, // Esperando nombre para Registrar
     REGISTRO_PEDIR_CONTRASENA, // Esperando contraseña para Registrar
     REGISTRO_PEDIR_CONFIRMACION, // Esperando confirmación de contraseña
-    MENU_LOBBY, // Usuario logueado o invitado en modo chat
+    MENU_CHAT, // Usuario logueado o invitado en modo chat
 }

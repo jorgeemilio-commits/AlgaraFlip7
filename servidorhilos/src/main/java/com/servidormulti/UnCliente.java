@@ -1,4 +1,3 @@
-// servidorhilos/src/main/java/com/servidormulti/UnCliente.java
 package com.servidormulti;
 
 import java.io.BufferedReader;
@@ -9,8 +8,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
-// ELIMINADO: import java.util.Map;
-// ELIMINADO: import java.util.concurrent.ConcurrentHashMap;
+import com.servidormulti.EstadoMenu;
+import com.servidormulti.ManejadorAutenticacion;
 
 public class UnCliente implements Runnable {
     
@@ -19,7 +18,7 @@ public class UnCliente implements Runnable {
     final String clienteID; 
     
     private final ManejadorMensajes manejadorMensajes;
-    private final ManejadorAutenticacion manejadorAutenticacion; // Nueva referencia
+    private final ManejadorAutenticacion manejadorAutenticacion; 
     
     private static final int LIMITE_MENSAJES_INVITADO = 3;
     
@@ -33,21 +32,23 @@ public class UnCliente implements Runnable {
     private String contrasenaTemporal = null;
     // ------------------------------------
 
-    // ELIMINADO: campos de juego (oponentePendiente, juegosActivos)
-    
     private final PrintWriter salidaUTF;
     private final BufferedReader entradaUTF;
     
     UnCliente(Socket s, String id, ContextoServidor contexto) throws java.io.IOException {
-        // ... (inicialización de I/O)
+        this.salidaUTF = new PrintWriter(new OutputStreamWriter(s.getOutputStream(), "UTF-8"), true);
+        this.entradaUTF = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"));
+        this.clienteID = id;
+        this.nombreUsuario = "Invitado-" + id;
+
         this.salida = new DataOutputStream(s.getOutputStream());
         this.entrada = new DataInputStream(s.getInputStream());
 
         this.manejadorMensajes = contexto.getManejadorMensajes();
-        this.manejadorAutenticacion = contexto.getManejadorAutenticacion(); // Referencia al manejador
+        this.manejadorAutenticacion = contexto.getManejadorAutenticacion();
     }
 
-    // --- MÉTODOS PÚBLICOS DE GESTIÓN DE ESTADO (Mantenidos en español) ---
+    // --- MÉTODOS PÚBLICOS DE GESTIÓN DE ESTADO ---
     public synchronized EstadoMenu obtenerEstadoActual() { return estadoActual; }
     public synchronized void establecerEstadoActual(EstadoMenu estado) { this.estadoActual = estado; }
     public synchronized String obtenerNombreTemporal() { return nombreTemporal; }
@@ -65,9 +66,34 @@ public class UnCliente implements Runnable {
     public void incrementarMensajesEnviados() { this.mensajesEnviados++; }
     public boolean estaLogueado() { return logueado; }
     
-    // ELIMINADO: Todos los métodos de juego (getOponentePendiente, estaEnJuego, etc.)
+    // **MÉTODO RESTAURADO: maneja el cambio de estado de usuario después de la autenticación.**
+    public boolean manejarLoginInterno(String nombre, String password) throws IOException {
+        
+        try {
+            this.nombreUsuario = nombre; 
+            this.logueado = true;
+            
+            // Unir al usuario al grupo 'Todos' (requerido para el chat)
+            new GrupoDB().unirseGrupo("Todos", nombre);
+            
+            return true;
+
+        } catch (Exception e) {
+            System.err.println("Error en la fase final de login para " + nombre + ": " + e.getMessage());
+            this.logueado = false;
+            this.nombreUsuario = "Invitado-" + this.clienteID;
+            return false;
+        }
+    }
     
-    // **NUEVO** Método manejarLogout (movido desde ManejadorComandos)
+    public void manejarLogoutInterno() {
+        if (this.logueado) {
+            this.logueado = false;
+            this.nombreUsuario = "Invitado-" + this.clienteID; 
+            this.mensajesEnviados = 0;
+        }
+    }
+    
     public void manejarLogout() throws IOException {
         if (!this.estaLogueado()) {
             this.salida.writeUTF("Ya estás desconectado. Tu nombre es: " + this.getNombreUsuario());
@@ -76,8 +102,6 @@ public class UnCliente implements Runnable {
         manejarLogoutInterno();
         this.salida.writeUTF("Has cerrado sesión. Tu nombre es ahora '" + this.getNombreUsuario() + "'.");
     }
-
-    // ... (manejarLoginInterno, manejarLogoutInterno)
 
     @Override
     public void run() {
@@ -98,6 +122,7 @@ public class UnCliente implements Runnable {
                 } 
                 // 2. Manejo de mensajes de chat (solo si estamos en modo CHAT)
                 else if (this.estadoActual == EstadoMenu.MENU_CHAT) {
+                    
                     if (!this.logueado) {
                         if (this.mensajesEnviados >= LIMITE_MENSAJES_INVITADO) {
                             this.salida.writeUTF("Límite de mensajes alcanzado. Por favor, inicia sesión.");
@@ -124,7 +149,7 @@ public class UnCliente implements Runnable {
             }
         }
     }
-
+    
     public void procesarRespuestaEnMenu(String respuesta, DataOutputStream salida) throws IOException {
         
         switch (obtenerEstadoActual()) {
@@ -201,7 +226,6 @@ public class UnCliente implements Runnable {
         this.estadoActual = EstadoMenu.MENU_PRINCIPAL;
     }
     
-    // **MÉTODO SIMPLIFICADO**
     public void mostrarMenuChat() throws IOException {
         String estado = this.logueado ? "Logueado" : "Invitado";
         String limite = this.logueado ? "Sin límite de mensajes." : "Límite de " + LIMITE_MENSAJES_INVITADO + " mensajes. Escribe /logout para volver al menú principal.";
