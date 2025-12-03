@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement; // Importado para crear sentencias simples
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,15 +32,13 @@ public class GrupoDB {
         return null;
     }
 
-    // Se eliminó crearGrupo y borrarGrupo.
-
     /**
-     * Une un usuario a un grupo. (Necesario para chats de partida y para "Todos")
+     * Une un usuario a un grupo.
      */
     public String unirseGrupo(String nombreGrupo, String nombreUsuario) {
         Integer grupoId = getGrupoId(nombreGrupo);
         if (grupoId == null) {
-            return "Error: El grupo '" + nombreGrupo + "' no existe.";
+            return "Error: La sala '" + nombreGrupo + "' no existe.";
         }
         
         String sqlInsert = "INSERT OR IGNORE INTO grupos_miembros (grupo_id, usuario_nombre) VALUES (?, ?)";
@@ -64,6 +63,31 @@ public class GrupoDB {
             ConexionDB.cerrarConexion(conn);
         }
     }
+    
+    /**
+     * Crea un nuevo grupo/sala en la base de datos.
+     */
+    public String crearGrupo(String nombreGrupo) {
+        String sqlInsert = "INSERT INTO grupos (nombre) VALUES (?)";
+        Connection conn = ConexionDB.conectar();
+        if (conn == null) return "Error de conexión.";
+
+        try (PreparedStatement insertStmt = conn.prepareStatement(sqlInsert)) {
+            insertStmt.setString(1, nombreGrupo);
+            insertStmt.executeUpdate();
+            
+            return "Sala '" + nombreGrupo + "' creada exitosamente.";
+            
+        } catch (SQLException e) {
+            if (e.getMessage().contains("UNIQUE constraint failed")) {
+                return "Error: El nombre de sala '" + nombreGrupo + "' ya está en uso.";
+            }
+            System.err.println("Error al crear grupo: " + e.getMessage());
+            return "Error interno al crear la sala.";
+        } finally {
+            ConexionDB.cerrarConexion(conn);
+        }
+    }
 
 
     /**
@@ -74,11 +98,13 @@ public class GrupoDB {
             return "Error: No puedes salir del grupo 'Todos'.";
         }
 
+        // Verificar si el grupo existe
         Integer grupoId = getGrupoId(nombreGrupo);
         if (grupoId == null) {
             return "Error: El grupo '" + nombreGrupo + "' no existe.";
         }
 
+        // Eliminar al usuario del grupo en la base de datos
         String sqlDeleteMiembro = "DELETE FROM grupos_miembros WHERE grupo_id = ? AND usuario_nombre = ?";
         Connection conn = ConexionDB.conectar();
         if (conn == null) return "Error de conexión.";
@@ -104,7 +130,7 @@ public class GrupoDB {
 
 
     /**
-     * Obtiene una lista de todos los miembros de un grupo. (Necesario para ManejadorMensajes)
+     * Obtiene una lista de todos los miembros de un grupo.
      */
     public List<String> getMiembrosGrupo(int grupoId) {
         List<String> miembros = new ArrayList<>();
@@ -123,5 +149,28 @@ public class GrupoDB {
             ConexionDB.cerrarConexion(conn);
         }
         return miembros;
+    }
+    
+    /**
+     * Obtiene una lista de los nombres de todos los grupos/salas.
+     */
+    public List<String> obtenerNombresDeGrupos() {
+        List<String> nombres = new ArrayList<>();
+        // Excluye el grupo "Todos"
+        String sql = "SELECT nombre FROM grupos WHERE nombre != 'Todos'"; 
+        Connection conn = ConexionDB.conectar();
+        if (conn == null) return nombres;
+        
+        try (Statement stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery(sql);
+            while (rs.next()) {
+                nombres.add(rs.getString("nombre"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al obtener nombres de grupos: " + e.getMessage());
+        } finally {
+            ConexionDB.cerrarConexion(conn);
+        }
+        return nombres;
     }
 }

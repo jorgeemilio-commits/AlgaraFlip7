@@ -14,15 +14,18 @@ public class Login {
      * @param password La contraseña del usuario.
      * @return true si las credenciales son correctas, false en caso contrario.
      */
+
     public boolean iniciarSesion(String nombre, String password) {
         String sql = "SELECT * FROM usuarios WHERE nombre = ? AND password = ?";
         Connection conn = ConexionDB.conectar();
         
+        // Verificar si la conexión a la base de datos fue exitosa
         if (conn == null) {
             System.err.println("No se pudo conectar para iniciar sesión.");
             return false;
         }
 
+        // Busca el usuario en la base de datos
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, nombre);
             pstmt.setString(2, password);

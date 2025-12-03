@@ -24,8 +24,7 @@ public class ContextoServidor {
     }
 
     // --- Getters ---
-
     public ManejadorMensajes getManejadorMensajes() { return manejadorMensajes; }
     public ManejadorAutenticacion getManejadorAutenticacion() { return manejadorAutenticacion; }
-
+    public GrupoDB getGrupoDB() { return grupoDB; }
 }
