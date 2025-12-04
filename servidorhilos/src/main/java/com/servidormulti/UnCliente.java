@@ -39,7 +39,6 @@ public class UnCliente implements Runnable {
         this.entrada = new DataInputStream(s.getInputStream());
 
         this.manejadorAutenticacion = contexto.getManejadorAutenticacion();
-        // ESTA LÍNEA AHORA FUNCIONARÁ PORQUE CONTEXTOSERVIDOR YA TIENE EL GETTER
         this.manejadorSalas = contexto.getManejadorSalas(); 
     }
 
@@ -59,7 +58,7 @@ public class UnCliente implements Runnable {
     public String getNombreUsuario() { return nombreUsuario; }
     public boolean estaLogueado() { return logueado; }
     
-    // MÉTODO QUE FALTABA (SOLUCIONA IMAGEN 3)
+    // Manejo Interno de Login/Logout
     public boolean manejarLoginInterno(String nombre, String password) throws IOException {
         try {
             this.nombreUsuario = nombre; 
@@ -73,6 +72,7 @@ public class UnCliente implements Runnable {
         }
     }
     
+    // Manejo Externo de Logout
     public void manejarLogoutInterno() {
         if (this.logueado) {
             manejadorSalas.salirDelGrupoActual(this);
@@ -81,6 +81,7 @@ public class UnCliente implements Runnable {
         }
     }
     
+    // Manejo Externo de Logout con Mensaje
     public void manejarLogout() throws IOException {
         manejarLogoutInterno();
         this.salida.writeUTF("Has cerrado sesión. Tu nombre es ahora '" + this.getNombreUsuario() + "'.");
@@ -89,34 +90,37 @@ public class UnCliente implements Runnable {
     @Override
     public void run() {
         try {
-            mostrarMenuPrincipal();
+            mostrarMenuPrincipal(); // Muestra el menú principal al conectar
         } catch (IOException e) { System.err.println("Error de bienvenida: " + e.getMessage()); }
 
         while (true) {
             try {
+                // Lee el mensaje del cliente
                 String mensaje = entrada.readUTF();
 
+                // Procesa el mensaje según el estado actual
                 if (esEstadoDeSalas(estadoActual)) {
                     manejadorSalas.procesar(mensaje, this, salida);
                 } else {
                     procesarAuth(mensaje, salida);
                 }
                 
-            } catch (Exception ex) {
+            } catch (Exception ex) { // El cliente se ha desconectado o hubo un error
                 System.out.println("Cliente " + this.nombreUsuario + " se ha desconectado.");
                 if (this.salaActual != null) {
                     manejadorSalas.salirDelGrupoActual(this);
                 }
-                ServidorMulti.clientes.remove(this.clienteID); 
+                ServidorMulti.clientes.remove(this.clienteID); // Elimina al cliente de la lista activa
                 try {
                     this.entrada.close();
                     this.salida.close();
-                } catch (IOException e) { e.printStackTrace(); }
+                } catch (IOException e) { e.printStackTrace(); } // Cierra flujos
                 break;
             }
         }
     }
     
+    // Verifica si el estado actual es uno relacionado con salas
     private boolean esEstadoDeSalas(EstadoMenu estado) {
         return estado == EstadoMenu.MENU_SALA_PRINCIPAL ||
                estado == EstadoMenu.MENU_UNIRSE_SALA ||
@@ -124,33 +128,34 @@ public class UnCliente implements Runnable {
                estado == EstadoMenu.SALA_ACTIVA;
     }
 
+    // Procesa la autenticación basada en el estado actual
     public void procesarAuth(String respuesta, DataOutputStream salida) throws IOException {
         
         switch (obtenerEstadoActual()) {
             
             case MENU_PRINCIPAL:
                 if (respuesta.equals("1")) { 
-                    establecerEstadoActual(EstadoMenu.INICIO_SESION_PEDIR_NOMBRE);
+                    establecerEstadoActual(EstadoMenu.INICIO_SESION_PEDIR_NOMBRE); // Cambia estado
                     salida.writeUTF("Introduce tu nombre de usuario:");
                 } else if (respuesta.equals("2")) { 
-                    establecerEstadoActual(EstadoMenu.REGISTRO_PEDIR_NOMBRE);
+                    establecerEstadoActual(EstadoMenu.REGISTRO_PEDIR_NOMBRE); // Cambia estado
                     salida.writeUTF("Introduce tu nombre de usuario (solo letras/números/acentos):");
                 } else if (respuesta.equals("3")) { 
                     salida.writeUTF("Has entrado como Invitado.");
-                    manejadorSalas.mostrarMenuSalaPrincipal(this, salida);
+                    manejadorSalas.mostrarMenuSalaPrincipal(this, salida); // Muestra menú de salas
                 } else {
                     salida.writeUTF("Opción no válida. Por favor, ingresa 1, 2, o 3.");
                     mostrarMenuPrincipal();
                 }
                 break;
                 
-            case INICIO_SESION_PEDIR_NOMBRE:
+            case INICIO_SESION_PEDIR_NOMBRE: // Guarda el nombre temporalmente y pide la contraseña
                 establecerNombreTemporal(respuesta);
-                establecerEstadoActual(EstadoMenu.INICIO_SESION_PEDIR_CONTRASENA);
+                establecerEstadoActual(EstadoMenu.INICIO_SESION_PEDIR_CONTRASENA); // Cambia estado
                 salida.writeUTF("Introduce tu contraseña:");
                 break;
                 
-            case INICIO_SESION_PEDIR_CONTRASENA:
+            case INICIO_SESION_PEDIR_CONTRASENA: // Intenta iniciar sesión con el nombre y contraseña proporcionados
                 boolean exitoLogin = manejadorAutenticacion.manejarInicioSesionInternoPorMenu(
                     obtenerNombreTemporal(), 
                     respuesta, 
@@ -158,30 +163,30 @@ public class UnCliente implements Runnable {
                     this
                 );
                 
+                // Limpia los datos temporales
                 limpiarTemporales(); 
                 
                 if (exitoLogin) {
-                    manejadorSalas.mostrarMenuSalaPrincipal(this, salida);
+                    manejadorSalas.mostrarMenuSalaPrincipal(this, salida); // Muestra menú de salas
                 } else {
-                    mostrarMenuPrincipal(); 
+                    mostrarMenuPrincipal(); // Vuelve al menú principal
                 }
                 break;
                 
-            case REGISTRO_PEDIR_NOMBRE:
+            case REGISTRO_PEDIR_NOMBRE: // Guarda el nombre temporalmente y pide la contraseña
                 manejadorAutenticacion.manejarRegistroPorMenu_Paso1(respuesta, salida, this);
                 break;
                 
-            case REGISTRO_PEDIR_CONTRASENA:
+            case REGISTRO_PEDIR_CONTRASENA: // Guarda la contraseña temporalmente y pide confirmación
                 manejadorAutenticacion.manejarRegistroPorMenu_Paso2(respuesta, salida, this);
                 break;
                 
-            case REGISTRO_PEDIR_CONFIRMACION:
-                // ESTA LÍNEA AHORA FUNCIONARÁ (SOLUCIONA IMAGEN 1)
+            case REGISTRO_PEDIR_CONFIRMACION: // Intenta registrar al usuario
                 boolean exitoRegistro = manejadorAutenticacion.manejarRegistroPorMenu_Paso3(respuesta, salida, this);
                 if (exitoRegistro) {
-                    manejadorSalas.mostrarMenuSalaPrincipal(this, salida);
+                    manejadorSalas.mostrarMenuSalaPrincipal(this, salida); // Muestra menú de salas
                 } else {
-                    mostrarMenuPrincipal();
+                    mostrarMenuPrincipal(); // Vuelve al menú principal
                 }
                 break;
                 
@@ -191,6 +196,7 @@ public class UnCliente implements Runnable {
         }
     }
 
+    // Muestra el menú principal al cliente
     public void mostrarMenuPrincipal() throws IOException {
         String menu = "\n" +
                       "--- Bienvenido al Servidor de Chat ---\n" +
