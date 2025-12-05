@@ -140,11 +140,13 @@ public class UnCliente implements Runnable {
                 } else if (respuesta.equals("2")) { 
                     establecerEstadoActual(EstadoMenu.REGISTRO_PEDIR_NOMBRE); // Cambia estado
                     salida.writeUTF("Introduce tu nombre de usuario (solo letras/números/acentos):");
+                    /* 
                 } else if (respuesta.equals("3")) { 
                     salida.writeUTF("Has entrado como Invitado.");
                     manejadorSalas.mostrarMenuSalaPrincipal(this, salida); // Muestra menú de salas
+                    */
                 } else {
-                    salida.writeUTF("Opción no válida. Por favor, ingresa 1, 2, o 3.");
+                    salida.writeUTF("Opción no válida. Por favor, ingresa 1 o 2.");
                     mostrarMenuPrincipal();
                 }
                 break;
@@ -204,9 +206,9 @@ public class UnCliente implements Runnable {
                       "Selecciona una opción:\n" +
                       "  1. Iniciar Sesión (Usuario registrado)\n" +
                       "  2. Registrar Nueva Cuenta\n" +
-                      "  3. Entrar como Invitado\n" +
+                      "  3. Entrar como Invitado (Desactivado) \n" +
                       "----------------------------------------------------\n" +
-                      "Ingresa el número de tu opción (1, 2 o 3):";
+                      "Ingresa el número de tu opción (1 o 2):";
         this.salida.writeUTF(menu);
         this.estadoActual = EstadoMenu.MENU_PRINCIPAL;
     }

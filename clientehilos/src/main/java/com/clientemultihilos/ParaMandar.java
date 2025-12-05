@@ -23,12 +23,6 @@ public class ParaMandar implements Runnable {
         try {
             // El bucle comprueba si hay null (Ctrl+Z)
             while ((mensaje = teclado.readLine()) != null) {
-                
-                // Comprobar si el comando es /cerrar
-                if (mensaje.equalsIgnoreCase("/cerrar")) {
-                    break; // Salir del bucle
-                }
-
                 salida.writeUTF(mensaje);
             }
             
