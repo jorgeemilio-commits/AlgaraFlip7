@@ -2,16 +2,29 @@ package com.servidormulti;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.ArrayList; 
+import java.util.HashMap;
+import java.util.HashSet; 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import com.servidormulti.Flip7.SesionJuego;
 
 public class ManejadorSalas {
 
     private final GrupoDB grupoDB;
     private final ManejadorMensajes manejadorMensajes;
+    
+    // mapas para controlar las partidas y los votos de listo
+    private final Map<String, SesionJuego> partidasActivas;
+    private final Map<String, Set<String>> votosListo;
 
     public ManejadorSalas(GrupoDB grupoDB, ManejadorMensajes manejadorMensajes) {
         this.grupoDB = grupoDB;
         this.manejadorMensajes = manejadorMensajes;
+        this.partidasActivas = new HashMap<>();
+        this.votosListo = new HashMap<>();
     }
 
     public void procesar(String mensaje, UnCliente cliente, DataOutputStream salida) throws IOException {
@@ -85,8 +98,23 @@ public class ManejadorSalas {
                 } else {
                     String nombreSala = cliente.obtenerSalaActual();
                     if (nombreSala != null) {  // Enviar mensaje a la sala actual
-                        String mensajeSala = "#" + nombreSala + " " + mensaje;
-                        manejadorMensajes.enrutarMensaje(cliente, mensajeSala);
+                        
+                        // checa si ya hay juego iniciado en esta sala
+                        SesionJuego juegoActual = partidasActivas.get(nombreSala);
+
+                        if (juegoActual != null && juegoActual.estaJuegoIniciado()) {
+                            // manda el mensaje a la logica del juego
+                            juegoActual.procesarMensajeJuego(cliente, mensaje);
+                        } else {
+                            // si ponen listo intenta iniciar partida
+                            if (mensaje.trim().equalsIgnoreCase("/listo")) {
+                                manejarComandoListo(cliente, nombreSala);
+                            } else {
+                                String mensajeSala = "#" + nombreSala + " " + mensaje;
+                                manejadorMensajes.enrutarMensaje(cliente, mensajeSala);
+                            }
+                        }
+
                     } else {
                         salida.writeUTF("Error: No estás en una sala válida.");
                         mostrarMenuSalaPrincipal(cliente, salida);
@@ -101,10 +129,62 @@ public class ManejadorSalas {
         }
     }
 
+    // agrega el voto y si son 3 arranca
+    private void manejarComandoListo(UnCliente cliente, String nombreSala) throws IOException {
+        votosListo.putIfAbsent(nombreSala, new HashSet<>());
+        Set<String> listos = votosListo.get(nombreSala);
+
+        if (listos.contains(cliente.getNombreUsuario())) {
+            cliente.getSalida().writeUTF("Ya estás marcado como listo. Esperando a los demás...");
+            return;
+        }
+        
+        listos.add(cliente.getNombreUsuario());
+        
+        String msgAviso = "#" + nombreSala + " El jugador " + cliente.getNombreUsuario() + " está LISTO (" + listos.size() + "/3 necesarios).";
+        manejadorMensajes.enrutarMensaje(cliente, msgAviso);
+
+        // si juntamos 3 o mas arranca
+        if (listos.size() >= 3) {
+            iniciarPartidaEnSala(nombreSala);
+        }
+    }
+
+    // crea la sesion de juego y busca a los clientes reales
+    private void iniciarPartidaEnSala(String nombreSala) {
+        Integer grupoId = grupoDB.getGrupoId(nombreSala);
+        if (grupoId == null) return;
+
+        List<String> nombresMiembros = grupoDB.getMiembrosGrupo(grupoId);
+        List<UnCliente> jugadoresConectados = new ArrayList<>();
+
+        for (String nombre : nombresMiembros) {
+            // busca el objeto cliente para pasarlo al juego
+            UnCliente c = ServidorMulti.buscarClientePorNombre(nombre); 
+            if (c != null && nombreSala.equals(c.obtenerSalaActual())) {
+                jugadoresConectados.add(c);
+            }
+        }
+
+        SesionJuego nuevaPartida = new SesionJuego(jugadoresConectados);
+        partidasActivas.put(nombreSala, nuevaPartida);
+        
+        // limpia los votos para la prox
+        votosListo.get(nombreSala).clear();
+        
+        nuevaPartida.iniciarPartida();
+    }
+
     public void salirDelGrupoActual(UnCliente cliente) { // Sale del grupo actual si está en uno
         String sala = cliente.obtenerSalaActual();
         if (sala != null) {
             grupoDB.salirGrupo(sala, cliente.getNombreUsuario());
+            
+            // quita el voto si se sale
+            if (votosListo.containsKey(sala)) {
+                votosListo.get(sala).remove(cliente.getNombreUsuario());
+            }
+
             cliente.establecerSalaActual(null);
         }
     }
@@ -195,6 +275,7 @@ public class ManejadorSalas {
         String menu = "\n" +
                       "--- SALA ACTIVA: #" + cliente.obtenerSalaActual() + " ---\n" +
                       "  * Escribe tu mensaje y presiona Enter.\n" +
+                      "  * Escribe /listo para votar iniciar partida (min 3).\n" + // para votar iniciar
                       "  * Para volver al menú principal de salas: /salir\n" +
                       "  " + limite + "\n" +
                       "----------------------------------------------------\n" +

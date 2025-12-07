@@ -33,4 +33,12 @@ public class ServidorMulti {
             System.err.println("Error al iniciar el servidor: " + e.getMessage());
         }
     }
+    public static UnCliente buscarClientePorNombre(String nombre) {
+        for (UnCliente c : clientes.values()) {
+            if (c.getNombreUsuario().equalsIgnoreCase(nombre)) {
+                return c;
+            }
+        }
+        return null;
+    }
 }
