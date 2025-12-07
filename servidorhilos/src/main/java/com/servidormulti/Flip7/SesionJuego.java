@@ -109,7 +109,7 @@ public class SesionJuego {
         broadcastMensaje(cliente.getNombreUsuario() + " jaló: " + carta);
         if (carta.obtenerTipo() == TipoCarta.ACCION) {
             procesarCartaAccion(cliente, jugador, carta);
-            return; 
+            return;
         }
 
         // Intentamos añadir la carta; sobrevivio es FALSE solo si hay BUST definitivo.
@@ -280,5 +280,18 @@ public class SesionJuego {
 
     public boolean estaJuegoIniciado() {
         return juegoIniciado;
+    }
+
+    public String obtenerReportePuntuacion() {
+        StringBuilder reporte = new StringBuilder("\n  Puntos Actuales  \n");
+
+        for (Jugador j : jugadores.values()) {
+            reporte.append(j.obtenerNombreUsuario())
+                    .append(": ")
+                    .append(j.obtenerPuntuacionTotal())
+                    .append(" pts\n");
+        }
+        reporte.append("--------\n");
+        return reporte.toString();
     }
 }
