@@ -91,6 +91,10 @@ public class SesionJuego {
             case "/parar":
                 accionParar(remitente, jugadorActual);
                 break;
+            case "/puntuacion":
+                String reporte = obtenerReportePuntuacion();
+                enviarMensajePrivado(remitente, reporte);
+                return;
             default:
                 enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar o escribe normal para chatear.");
         }
