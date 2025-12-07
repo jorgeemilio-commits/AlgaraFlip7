@@ -53,4 +53,11 @@ public class ManejadorAcciones {
         }
         return reporte.toString();
     }
+    public String transferirSecondChance(Jugador objetivo) {
+        if (objetivo == null) return "Objetivo inválido.";
+        
+        // Simplemente se le activa la bandera. Si ya la tenía, pues sigue teniéndola.
+        objetivo.setTieneSecondChance(true);
+        return objetivo.obtenerNombreUsuario() + " ha recibido una Second Chance regalada.";
+    }
 }
