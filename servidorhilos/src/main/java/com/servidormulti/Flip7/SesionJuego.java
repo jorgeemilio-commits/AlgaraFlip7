@@ -24,8 +24,37 @@ public class SesionJuego {
         this.calculadora = new CalculadorPuntuacion();
     }
 
- 
+   
 
+    private void siguienteTurno() {
+        if (verificarFinDeRonda()) {
+            finalizarRonda();
+            return;
+        }
+        int intentos = 0;
+        do {
+            indiceTurnoActual = (indiceTurnoActual + 1) % clientesEnSala.size();
+            UnCliente proximoCliente = clientesEnSala.get(indiceTurnoActual);
+            Jugador proximoJugador = jugadores.get(proximoCliente.getClienteID());
+
+            if (!proximoJugador.tieneBUST() && !proximoJugador.sePlanto()) {
+                anunciarTurno();
+                return;
+            }
+            intentos++;
+        } while (intentos < clientesEnSala.size());
+        finalizarRonda();
+    }
+
+    private boolean verificarFinDeRonda() {
+        for (Jugador j : jugadores.values()) {
+            if (!j.tieneBUST() && !j.sePlanto()) {
+                return false; 
+            }
+        }
+        return true;
+    }
+//comiteado
     private void finalizarRonda() {
         broadcastMensaje("\n--- FIN DE LA RONDA ---");
         broadcastMensaje("Resultados:");
@@ -38,7 +67,7 @@ public class SesionJuego {
         juegoIniciado = false;
         broadcastMensaje("Escriban /listo para iniciar otra vez.");
     }
-//comiteado
+
     private void anunciarTurno() {
         UnCliente actual = clientesEnSala.get(indiceTurnoActual);
         broadcastMensaje("\n>>> Turno de: " + actual.getNombreUsuario() + " <<<");
