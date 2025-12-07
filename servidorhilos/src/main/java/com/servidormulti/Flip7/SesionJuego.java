@@ -47,45 +47,51 @@ public class SesionJuego {
     }
 
     public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
-        if (!juegoIniciado) return;
+    if (!juegoIniciado) return;
 
-        UnCliente clienteActual = clientesEnSala.get(indiceTurnoActual);
-        if (!remitente.getClienteID().equals(clienteActual.getClienteID())) {
-            enviarMensajePrivado(remitente, "No es tu turno. Espera a " + clienteActual.getNombreUsuario());
-            return;
-        }
-
-        Jugador jugadorActual = jugadores.get(remitente.getClienteID());
-        
-        // Separamos el comando de los argumentos (para /usar nombre)
-        String[] partes = mensaje.trim().split("\\s+");
-        String comando = partes[0].toLowerCase();
-        if (esperandoObjetivo) {
-            if (comando.equals("/usar")) {
-                if (partes.length < 2) {
-                    enviarMensajePrivado(remitente, "Debes especificar un nombre. Ej: /usar Juan");
-                    return;
-                }
-                String nombreObjetivo = partes[1];
-                ejecutarAccionPendiente(remitente, nombreObjetivo);
-            } else {
-                enviarMensajePrivado(remitente, "¡Tienes una carta de ACCIÓN pendiente! Debes usarla con: /usar [NombreJugador]");
-            }
-            return; // Importante: No dejar pasar al switch normal
-        }
-
-        //  FLUJO NORMAL DE JUEGO 
-        switch (comando) {
-            case "/jalar":
-                accionJalar(remitente, jugadorActual);
-                break;
-            case "/parar":
-                accionParar(remitente, jugadorActual);
-                break;
-            default:
-                enviarMensajePrivado(remitente, "Comando no válido en tu turno. Usa /jalar o /parar.");
-        }
+    //  HABILITAR CHAT 
+    // Si NO empieza con "/", es un mensaje de chat para todos.
+    if (!mensaje.trim().startsWith("/")) {
+        broadcastMensaje("<" + remitente.getNombreUsuario() + ">: " + mensaje);
+        return; // Terminamos aquí, no procesamos como comando.
     }
+
+    UnCliente clienteActual = clientesEnSala.get(indiceTurnoActual);
+    if (!remitente.getClienteID().equals(clienteActual.getClienteID())) {
+        enviarMensajePrivado(remitente, "No es tu turno. Puedes chatear, pero espera a " + clienteActual.getNombreUsuario() + " para jugar.");
+        return;
+    }
+
+    Jugador jugadorActual = jugadores.get(remitente.getClienteID());
+    
+    String[] partes = mensaje.trim().split("\\s+");
+    String comando = partes[0].toLowerCase();
+
+    if (esperandoObjetivo) {
+        if (comando.equals("/usar")) {
+            if (partes.length < 2) {
+                enviarMensajePrivado(remitente, "Debes especificar un nombre. Ej: /usar Juan");
+                return;
+            }
+            String nombreObjetivo = partes[1];
+            ejecutarAccionPendiente(remitente, nombreObjetivo);
+        } else {
+            enviarMensajePrivado(remitente, "¡Tienes una carta de ACCIÓN pendiente! Usa: /usar [NombreDeLaLista]");
+        }
+        return; 
+    }
+
+    switch (comando) {
+        case "/jalar":
+            accionJalar(remitente, jugadorActual);
+            break;
+        case "/parar":
+            accionParar(remitente, jugadorActual);
+            break;
+        default:
+            enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar o escribe normal para chatear.");
+    }
+}
 
     private void accionJalar(UnCliente cliente, Jugador jugador) {
         Carta carta = baraja.jalarCarta();
@@ -118,29 +124,61 @@ public class SesionJuego {
 
   
     private void procesarCartaAccion(UnCliente cliente, Jugador jugador, Carta carta) {
-        String nombreCarta = carta.toString();
+    String nombreCarta = carta.toString();
+    boolean requiereObjetivo = false;
+    
+    // Lista para guardar nombres de posibles víctimas
+    StringBuilder listaObjetivos = new StringBuilder();
+    int contadorValidos = 0;
 
-        if (nombreCarta.equals("Second Chance")) {
-           // Si ya tiene, debe darla a otro. Si no, se la queda.
-            if (jugador.tieneSecondChance()) {
-                this.accionPendiente = carta;
-                this.esperandoObjetivo = true;
-                enviarMensajePrivado(cliente, "¡Ya tienes una Second Chance! Debes regalar esta a otro jugador. Escribe: /usar [NombreJugador]");
-            } else {
-                // Se la queda automáticamente
-                jugador.setTieneSecondChance(true);
-                broadcastMensaje(cliente.getNombreUsuario() + " ha obtenido una Second Chance (Vida Extra).");
-                // El turno continúa
-                enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
+    // Lógica específica para filtrar quién es válido
+    if (nombreCarta.equals("Second Chance") && jugador.tieneSecondChance()) {
+        requiereObjetivo = true;
+        // Para regalar vida, buscamos a cualquiera que NO sea yo
+        listaObjetivos.append("--- JUGADORES DISPONIBLES PARA REGALAR VIDA ---\n");
+        for (UnCliente c : clientesEnSala) {
+            if (!c.getClienteID().equals(cliente.getClienteID())) {
+                listaObjetivos.append(" - ").append(c.getNombreUsuario()).append("\n");
+                contadorValidos++;
             }
-        
-        } else if (nombreCarta.equals("Freeze") || nombreCarta.equals("Flip Three")) {
-            // Estas siempre requieren un objetivo
+        }
+    } else if (nombreCarta.equals("Freeze") || nombreCarta.equals("Flip Three")) {
+        requiereObjetivo = true;
+        // Para atacar, buscamos a quienes NO se han plantado ni perdido
+        listaObjetivos.append("--- VÍCTIMAS DISPONIBLES ---\n");
+        for (UnCliente c : clientesEnSala) {
+            Jugador j = jugadores.get(c.getClienteID());
+            // No me ataco a mí mismo, ni a los que ya terminaron (plantados/bust)
+            if (!c.getClienteID().equals(cliente.getClienteID()) && !j.sePlanto() && !j.tieneBUST()) {
+                listaObjetivos.append(" - ").append(c.getNombreUsuario()).append("\n");
+                contadorValidos++;
+            }
+        }
+    } else if (nombreCarta.equals("Second Chance") && !jugador.tieneSecondChance()) {
+        // Caso simple: Se la queda él mismo
+        jugador.setTieneSecondChance(true);
+        broadcastMensaje(cliente.getNombreUsuario() + " se queda con una Second Chance (Vida Extra).");
+        enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
+        return;
+    }
+
+   
+    if (requiereObjetivo) {
+        if (contadorValidos > 0) {
+            // Si hay víctimas, activamos el modo espera y mostramos la lista 
             this.accionPendiente = carta;
             this.esperandoObjetivo = true;
-            enviarMensajePrivado(cliente, "¡Has sacado " + nombreCarta + "! Debes aplicarla a alguien. Escribe: /usar [NombreJugador]");
+            enviarMensajePrivado(cliente, "¡Sacaste " + nombreCarta + "!");
+            enviarMensajePrivado(cliente, listaObjetivos.toString());
+            enviarMensajePrivado(cliente, "Escribe: /usar [Nombre] para aplicarla.");
+        } else {
+            // Si NO hay nadie a quien atacar/regalar, la carta se descarta 
+            broadcastMensaje(cliente.getNombreUsuario() + " sacó " + nombreCarta + ", pero no hay objetivos válidos. La carta se descarta.");
+            enviarMensajePrivado(cliente, "No hay nadie a quien aplicarle la carta. Turno continúa.");
+            enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
         }
     }
+}
 
     private void ejecutarAccionPendiente(UnCliente atacante, String nombreObjetivo) {
         // Buscar al cliente objetivo por nombre
