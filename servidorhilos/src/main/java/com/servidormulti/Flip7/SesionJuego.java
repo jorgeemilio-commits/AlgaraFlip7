@@ -24,18 +24,26 @@ public class SesionJuego {
         this.calculadora = new CalculadorPuntuacion();
     }
 
-   
+ 
 
-
-
-   
-
+    private void finalizarRonda() {
+        broadcastMensaje("\n--- FIN DE LA RONDA ---");
+        broadcastMensaje("Resultados:");
+        
+        for (UnCliente c : clientesEnSala) {
+            Jugador j = jugadores.get(c.getClienteID());
+            int puntos = j.tieneBUST() ? 0 : calculadora.calcularPuntuacion(j.obtenerCartasEnMano());
+            broadcastMensaje(" -> " + c.getNombreUsuario() + ": " + puntos + " puntos. (" + j.obtenerCartasEnMano() + ")");
+        }
+        juegoIniciado = false;
+        broadcastMensaje("Escriban /listo para iniciar otra vez.");
+    }
+//comiteado
     private void anunciarTurno() {
         UnCliente actual = clientesEnSala.get(indiceTurnoActual);
         broadcastMensaje("\n>>> Turno de: " + actual.getNombreUsuario() + " <<<");
         enviarMensajePrivado(actual, "Es tu turno. Escribe /jalar o /parar");
     }
-
 
     private void broadcastMensaje(String msg) {
         for (UnCliente c : clientesEnSala) {

@@ -212,4 +212,11 @@ public class UnCliente implements Runnable {
         this.salida.writeUTF(menu);
         this.estadoActual = EstadoMenu.MENU_PRINCIPAL;
     }
+    public String getClienteID() {
+        return this.clienteID;
+    }
+
+    public DataOutputStream getSalida() {
+        return this.salida;
+    }
 }
