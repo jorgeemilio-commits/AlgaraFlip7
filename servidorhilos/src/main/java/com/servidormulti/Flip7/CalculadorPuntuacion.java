@@ -9,7 +9,7 @@ public class CalculadorPuntuacion {
         int sumaBase = 0;
         int multiplicador = 1;
         int bonoPuntos = 0;
-        
+
         Set<Integer> valoresUnicos = new HashSet<>();
 
         for (Carta c : mano) {
@@ -19,21 +19,32 @@ public class CalculadorPuntuacion {
             } else if (c.obtenerTipo() == TipoCarta.BONUS) {
                 if (c.toString().equals("x2")) {
                     multiplicador *= 2;
-                } else if (c.toString().contains("+10")) { 
+                } else if (c.toString().contains("+10")) {
                     bonoPuntos += 10;
                 }
             }
         }
-
 
         int total = sumaBase * multiplicador;
 
         total += bonoPuntos;
 
         if (valoresUnicos.size() >= 7) {
-            total += 15; 
+            total += 15;
         }
 
         return total;
     }
+
+    public boolean verificarFlip7(List<Carta> mano) {
+        Set<Integer> valoresUnicos = new HashSet<>();
+
+        for (Carta c : mano) {
+            if (c.obtenerTipo() == TipoCarta.NUMERICA) {
+                valoresUnicos.add(c.obtenerValor());
+            }
+        }
+        return valoresUnicos.size() >= 7;
+    }
+
 }
