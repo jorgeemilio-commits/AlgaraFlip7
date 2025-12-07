@@ -13,15 +13,20 @@ public class SesionJuego {
     private final Map<String, Jugador> jugadores; // Mapa ID_Cliente -> JugadorLogico
     private final Baraja baraja;
     private final CalculadorPuntuacion calculadora;
-    
+    private final ManejadorAcciones manejadorAcciones; 
     private boolean juegoIniciado = false;
     private int indiceTurnoActual = 0;
+    private boolean esperandoObjetivo = false;
+    private Carta accionPendiente = null;
 
     public SesionJuego(List<UnCliente> clientes) {
         this.clientesEnSala = clientes;
         this.jugadores = new HashMap<>();
         this.baraja = new Baraja();
         this.calculadora = new CalculadorPuntuacion();
+        
+        // Inicializamos el manejador de acciones
+        this.manejadorAcciones = new ManejadorAcciones(); 
     }
 
     public void iniciarPartida() {
@@ -33,7 +38,9 @@ public class SesionJuego {
         }
         baraja.reiniciarBaraja();
         indiceTurnoActual = new Random().nextInt(clientesEnSala.size());
+        
         juegoIniciado = true;
+        esperandoObjetivo = false; // Resetear estado de acciones
 
         broadcastMensaje("--- ¡LA PARTIDA DE FLIP7 HA COMENZADO! ---");
         anunciarTurno();
@@ -49,8 +56,25 @@ public class SesionJuego {
         }
 
         Jugador jugadorActual = jugadores.get(remitente.getClienteID());
-        String comando = mensaje.trim().toLowerCase();
+        
+        // Separamos el comando de los argumentos (para /usar nombre)
+        String[] partes = mensaje.trim().split("\\s+");
+        String comando = partes[0].toLowerCase();
+        if (esperandoObjetivo) {
+            if (comando.equals("/usar")) {
+                if (partes.length < 2) {
+                    enviarMensajePrivado(remitente, "Debes especificar un nombre. Ej: /usar Juan");
+                    return;
+                }
+                String nombreObjetivo = partes[1];
+                ejecutarAccionPendiente(remitente, nombreObjetivo);
+            } else {
+                enviarMensajePrivado(remitente, "¡Tienes una carta de ACCIÓN pendiente! Debes usarla con: /usar [NombreJugador]");
+            }
+            return; // Importante: No dejar pasar al switch normal
+        }
 
+        //  FLUJO NORMAL DE JUEGO 
         switch (comando) {
             case "/jalar":
                 accionJalar(remitente, jugadorActual);
@@ -73,16 +97,94 @@ public class SesionJuego {
         }
 
         broadcastMensaje(cliente.getNombreUsuario() + " jaló: " + carta);
+
+         // DETECCIÓN DE CARTAS DE ACCIÓN 
+        if (carta.obtenerTipo() == TipoCarta.ACCION) {
+            procesarCartaAccion(cliente, jugador, carta);
+            return; // Salimos para esperar input del usuario o resolver efecto
+        }
+
+        // Lógica Normal (Numéricas y Bonus)
         boolean sobrevivio = jugador.intentarJalarCarta(carta);
 
         if (!sobrevivio) {
-            broadcastMensaje("¡BUST! " + cliente.getNombreUsuario() + " ha perdido la ronda con la carta repetida: " + carta);
+            broadcastMensaje("¡BUST! " + cliente.getNombreUsuario() + " ha perdido la ronda.");
             siguienteTurno();
         } else {
             enviarMensajePrivado(cliente, "Tu mano actual: " + jugador.obtenerCartasEnMano());
             enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
         }
     }
+
+    LÓGICA DE PROCESAMIENTO DE ACCIONES 
+    private void procesarCartaAccion(UnCliente cliente, Jugador jugador, Carta carta) {
+        String nombreCarta = carta.toString();
+
+        if (nombreCarta.equals("Second Chance")) {
+           // Si ya tiene, debe darla a otro. Si no, se la queda.
+            if (jugador.tieneSecondChance()) {
+                this.accionPendiente = carta;
+                this.esperandoObjetivo = true;
+                enviarMensajePrivado(cliente, "¡Ya tienes una Second Chance! Debes regalar esta a otro jugador. Escribe: /usar [NombreJugador]");
+            } else {
+                // Se la queda automáticamente
+                jugador.setTieneSecondChance(true);
+                broadcastMensaje(cliente.getNombreUsuario() + " ha obtenido una Second Chance (Vida Extra).");
+                // El turno continúa
+                enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
+            }
+        
+        } else if (nombreCarta.equals("Freeze") || nombreCarta.equals("Flip Three")) {
+            // Estas siempre requieren un objetivo
+            this.accionPendiente = carta;
+            this.esperandoObjetivo = true;
+            enviarMensajePrivado(cliente, "¡Has sacado " + nombreCarta + "! Debes aplicarla a alguien. Escribe: /usar [NombreJugador]");
+        }
+    }
+
+    private void ejecutarAccionPendiente(UnCliente atacante, String nombreObjetivo) {
+        // Buscar al cliente objetivo por nombre
+        UnCliente clienteObj = null;
+        for (UnCliente c : clientesEnSala) {
+            if (c.getNombreUsuario().equalsIgnoreCase(nombreObjetivo)) {
+                clienteObj = c;
+                break;
+            }
+        }
+        
+        if (clienteObj == null) {
+            enviarMensajePrivado(atacante, "Jugador '" + nombreObjetivo + "' no encontrado en la sala. Intenta de nuevo.");
+            return;
+        }
+
+        // Obtener el Jugador lógico
+        Jugador objetivo = jugadores.get(clienteObj.getClienteID());
+        String resultado = "";
+
+        // Ejecutar la acción correspondiente
+        String nombreAccion = accionPendiente.toString();
+        
+        if (nombreAccion.equals("Second Chance")) {
+            resultado = manejadorAcciones.transferirSecondChance(objetivo);
+        
+        } else if (nombreAccion.equals("Freeze")) {
+            resultado = manejadorAcciones.aplicarFreeze(objetivo);
+        
+        } else if (nombreAccion.equals("Flip Three")) {
+            resultado = manejadorAcciones.aplicarFlipThree(objetivo, baraja);
+        }
+
+        // Anunciar resultado
+        broadcastMensaje("ACCIÓN " + nombreAccion + ": " + resultado);
+        
+        // Limpiar estado de acción
+        this.esperandoObjetivo = false;
+        this.accionPendiente = null;
+
+        // El turno continúa para el jugador actual después de usar la acción
+        enviarMensajePrivado(atacante, "¿Quieres /jalar otra o /parar?");
+    }
+    
 
     private void accionParar(UnCliente cliente, Jugador jugador) {
         jugador.plantarse();
@@ -96,18 +198,21 @@ public class SesionJuego {
             finalizarRonda();
             return;
         }
+        
         int intentos = 0;
         do {
             indiceTurnoActual = (indiceTurnoActual + 1) % clientesEnSala.size();
             UnCliente proximoCliente = clientesEnSala.get(indiceTurnoActual);
             Jugador proximoJugador = jugadores.get(proximoCliente.getClienteID());
 
+            // Solo pasa el turno si NO tiene BUST y NO se plantó
             if (!proximoJugador.tieneBUST() && !proximoJugador.sePlanto()) {
                 anunciarTurno();
                 return;
             }
             intentos++;
         } while (intentos < clientesEnSala.size());
+        
         finalizarRonda();
     }
 
@@ -141,16 +246,12 @@ public class SesionJuego {
 
     private void broadcastMensaje(String msg) {
         for (UnCliente c : clientesEnSala) {
-            try { 
-                c.getSalida().writeUTF(msg); 
-            } catch (IOException e) { /* Ignorar desconexión */ }
+            try { c.getSalida().writeUTF(msg); } catch (IOException e) { /* Ignorar desconexión */ }
         }
     }
 
     private void enviarMensajePrivado(UnCliente c, String msg) {
-        try { 
-            c.getSalida().writeUTF(msg); 
-        } catch (IOException e) { /* Ignorar */ }
+        try { c.getSalida().writeUTF(msg); } catch (IOException e) { /* Ignorar */ }
     }
     
     public boolean estaJuegoIniciado() { return juegoIniciado; }
