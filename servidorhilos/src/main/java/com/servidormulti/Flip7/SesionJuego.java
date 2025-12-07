@@ -316,4 +316,17 @@ public class SesionJuego {
     public boolean estaJuegoIniciado() {
         return juegoIniciado;
     }
+
+    public String obtenerReportePuntuacion() {
+        StringBuilder reporte = new StringBuilder("\n--- PUNTAJES ACTUALES ---\n");
+
+        for (Jugador j : jugadores.values()) {
+            reporte.append(j.obtenerNombreUsuario())
+                    .append(": ")
+                    .append(j.obtenerPuntuacionTotal())
+                    .append(" pts\n");
+        }
+        reporte.append("-------------------------\n");
+        return reporte.toString();
+    }
 }
