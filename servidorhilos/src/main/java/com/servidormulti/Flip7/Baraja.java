@@ -19,10 +19,27 @@ public class Baraja {
                 cartas.add(new Carta(valor, String.valueOf(valor), TipoCarta.NUMERICA));
             }
         }
+        
+        // Second Chance
+        for (int i = 0; i < 3; i++) {
+            cartas.add(new Carta(0, "Second Chance", TipoCarta.ACCION));
+        }
 
-        cartas.add(new Carta(0, "Second Chance", TipoCarta.ACCION));
+        // Freeze (Congelar)
+        for (int i = 0; i < 3; i++) {
+            cartas.add(new Carta(0, "Freeze", TipoCarta.ACCION));
+        }
+
+        // Flip Three (Jalar 3)
+        for (int i = 0; i < 3; i++) {
+            cartas.add(new Carta(0, "Flip Three", TipoCarta.ACCION));
+        }
+
+        // Bonus (x2 y +10)
         cartas.add(new Carta(0, "x2", TipoCarta.BONUS));
+        cartas.add(new Carta(0, "+10", TipoCarta.BONUS));
 
+        // Barajear al final de la creación
         Collections.shuffle(this.cartas);
     }
 

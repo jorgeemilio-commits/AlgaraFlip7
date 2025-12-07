@@ -116,7 +116,7 @@ public class SesionJuego {
         }
     }
 
-    LÓGICA DE PROCESAMIENTO DE ACCIONES 
+  
     private void procesarCartaAccion(UnCliente cliente, Jugador jugador, Carta carta) {
         String nombreCarta = carta.toString();
 
