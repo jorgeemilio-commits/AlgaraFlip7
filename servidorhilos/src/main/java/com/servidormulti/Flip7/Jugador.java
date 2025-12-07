@@ -8,6 +8,7 @@ public class Jugador {
     private List<Carta> cartasEnMano;
     private boolean tieneBUST;
     private boolean sePlanto;
+    private int puntuacionTotal;
     
    
     private boolean tieneSecondChance; 
@@ -20,6 +21,7 @@ public class Jugador {
         this.sePlanto = false;
         this.tieneSecondChance = false; 
         this.estaCongelado = false; // Inicializamos
+        this.puntuacionTotal = 0;
     }
 
     // Comando /parar 
@@ -85,6 +87,14 @@ public class Jugador {
         // Reiniciamos estados especiales también
         this.tieneSecondChance = false;
         this.estaCongelado = false;
+    }
+
+    public void sumarPuntos(int puntos) {
+        this.puntuacionTotal += puntos;
+    }
+
+    public int obtenerPuntuacionTotal() { 
+        return puntuacionTotal; 
     }
 
     public String obtenerNombreUsuario() { return nombreUsuario; }
