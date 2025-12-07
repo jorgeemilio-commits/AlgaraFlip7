@@ -24,7 +24,72 @@ public class SesionJuego {
         this.calculadora = new CalculadorPuntuacion();
     }
 
-   
+    public void iniciarPartida() {
+        if (juegoIniciado) return;
+
+        jugadores.clear();
+        for (UnCliente c : clientesEnSala) {
+            jugadores.put(c.getClienteID(), new Jugador(c.getNombreUsuario()));
+        }
+        baraja.reiniciarBaraja();
+        indiceTurnoActual = new Random().nextInt(clientesEnSala.size());
+        juegoIniciado = true;
+
+        broadcastMensaje("--- ¡LA PARTIDA DE FLIP7 HA COMENZADO! ---");
+        anunciarTurno();
+    }
+
+    public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
+        if (!juegoIniciado) return;
+
+        UnCliente clienteActual = clientesEnSala.get(indiceTurnoActual);
+        if (!remitente.getClienteID().equals(clienteActual.getClienteID())) {
+            enviarMensajePrivado(remitente, "No es tu turno. Espera a " + clienteActual.getNombreUsuario());
+            return;
+        }
+
+        Jugador jugadorActual = jugadores.get(remitente.getClienteID());
+        String comando = mensaje.trim().toLowerCase();
+
+        switch (comando) {
+            case "/jalar":
+                accionJalar(remitente, jugadorActual);
+                break;
+            case "/parar":
+                accionParar(remitente, jugadorActual);
+                break;
+            default:
+                enviarMensajePrivado(remitente, "Comando no válido en tu turno. Usa /jalar o /parar.");
+        }
+    }
+
+    private void accionJalar(UnCliente cliente, Jugador jugador) {
+        Carta carta = baraja.jalarCarta();
+        
+        if (carta == null) {
+            broadcastMensaje("¡Se acabó la baraja! Barajeando descarte...");
+            baraja.reiniciarBaraja(); 
+            carta = baraja.jalarCarta();
+        }
+
+        broadcastMensaje(cliente.getNombreUsuario() + " jaló: " + carta);
+        boolean sobrevivio = jugador.intentarJalarCarta(carta);
+
+        if (!sobrevivio) {
+            broadcastMensaje("¡BUST! " + cliente.getNombreUsuario() + " ha perdido la ronda con la carta repetida: " + carta);
+            siguienteTurno();
+        } else {
+            enviarMensajePrivado(cliente, "Tu mano actual: " + jugador.obtenerCartasEnMano());
+            enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
+        }
+    }
+
+    private void accionParar(UnCliente cliente, Jugador jugador) {
+        jugador.plantarse();
+        int puntos = calculadora.calcularPuntuacion(jugador.obtenerCartasEnMano());
+        broadcastMensaje(cliente.getNombreUsuario() + " se ha PLANTADO con " + puntos + " puntos provisionales.");
+        siguienteTurno();
+    }
 
     private void siguienteTurno() {
         if (verificarFinDeRonda()) {
@@ -54,7 +119,7 @@ public class SesionJuego {
         }
         return true;
     }
-//comiteado
+
     private void finalizarRonda() {
         broadcastMensaje("\n--- FIN DE LA RONDA ---");
         broadcastMensaje("Resultados:");
