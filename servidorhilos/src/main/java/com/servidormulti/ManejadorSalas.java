@@ -35,11 +35,11 @@ public class ManejadorSalas {
                     mostrarSalasDisponibles(cliente, salida);
                     
                 } else if (mensaje.equals("2")) { // Crear una sala
-                    if (!cliente.estaLogueado()) { // Solo usuarios registrados pueden crear salas
+                    if (!cliente.estaLogueado()) { 
                         salida.writeUTF("Error: Solo los usuarios registrados pueden crear salas.");
                         mostrarMenuSalaPrincipal(cliente, salida);
                     } else {
-                        cliente.establecerEstadoActual(EstadoMenu.MENU_CREAR_SALA_NOMBRE); // Esperando nombre de sala
+                        cliente.establecerEstadoActual(EstadoMenu.MENU_CREAR_SALA_NOMBRE); 
                         salida.writeUTF("Introduce el nombre de la nueva sala (solo letras/números):");
                     }
                     
@@ -54,17 +54,20 @@ public class ManejadorSalas {
                 break;
 
             case MENU_UNIRSE_SALA:
-                if (mensaje.trim().equalsIgnoreCase("/salir")) { // Volver al menú principal de salas
+                if (mensaje.trim().equalsIgnoreCase("/salir")) { 
                     mostrarMenuSalaPrincipal(cliente, salida);
                     return;
                 }
                 
-                try { // Consigue una lista de las salas disponibles
-                    int indiceSeleccionado = Integer.parseInt(mensaje.trim());
-                    List<String> salas = grupoDB.obtenerNombresDeGrupos(); 
+                try { 
+                    // Obtenemos el mapa actualizado para validar la selección
+                    Map<String, Integer> salasMap = grupoDB.obtenerSalasDisponibles();
+                    List<String> salasLista = new ArrayList<>(salasMap.keySet());
                     
-                    if (indiceSeleccionado >= 1 && indiceSeleccionado <= salas.size()) {
-                        String nombreSala = salas.get(indiceSeleccionado - 1); 
+                    int indiceSeleccionado = Integer.parseInt(mensaje.trim());
+                    
+                    if (indiceSeleccionado >= 1 && indiceSeleccionado <= salasLista.size()) {
+                        String nombreSala = salasLista.get(indiceSeleccionado - 1); 
                         
                         // Intenta unirse a la sala seleccionada
                         if (unirseASala(nombreSala, cliente, salida)) {
@@ -72,19 +75,19 @@ public class ManejadorSalas {
                         } else {
                             mostrarMenuSalaPrincipal(cliente, salida);
                         }
-                    } else { // Índice fuera de rango
+                    } else { 
                         salida.writeUTF("Número de sala no válido. Elige un número de la lista o escribe /salir.");
                         mostrarSalasDisponibles(cliente, salida);
                     }
                     
-                } catch (NumberFormatException e) { // Entrada no es un número válido
+                } catch (NumberFormatException e) { 
                     salida.writeUTF("Entrada no válida. Debes escribir el NÚMERO de la sala.");
                     mostrarSalasDisponibles(cliente, salida);
                 }
                 break;
 
             case MENU_CREAR_SALA_NOMBRE:
-                if (crearSala(mensaje, cliente, salida)) { // Intenta crear la sala
+                if (crearSala(mensaje, cliente, salida)) { 
                     mostrarInterfazSalaActiva(cliente, salida);
                 } else {
                     mostrarMenuSalaPrincipal(cliente, salida);
@@ -92,21 +95,18 @@ public class ManejadorSalas {
                 break;
 
             case SALA_ACTIVA:
-                if (mensaje.trim().equalsIgnoreCase("/salir")) { // Salir de la sala y volver al menú principal de salas
+                if (mensaje.trim().equalsIgnoreCase("/salir")) { 
                     salirDelGrupoActual(cliente);
                     mostrarMenuSalaPrincipal(cliente, salida);
                 } else {
                     String nombreSala = cliente.obtenerSalaActual();
-                    if (nombreSala != null) {  // Enviar mensaje a la sala actual
+                    if (nombreSala != null) {  
                         
-                        // checa si ya hay juego iniciado en esta sala
                         SesionJuego juegoActual = partidasActivas.get(nombreSala);
 
                         if (juegoActual != null && juegoActual.estaJuegoIniciado()) {
-                            // manda el mensaje a la logica del juego
                             juegoActual.procesarMensajeJuego(cliente, mensaje);
                         } else {
-                            // si ponen listo intenta iniciar partida
                             if (mensaje.trim().equalsIgnoreCase("/listo")) {
                                 manejarComandoListo(cliente, nombreSala);
                             } else {
@@ -129,7 +129,7 @@ public class ManejadorSalas {
         }
     }
 
-    // agrega el voto y si son 3 arranca
+    // maneja el comando /listo del cliente
     private void manejarComandoListo(UnCliente cliente, String nombreSala) throws IOException {
         votosListo.putIfAbsent(nombreSala, new HashSet<>());
         Set<String> listos = votosListo.get(nombreSala);
@@ -144,13 +144,12 @@ public class ManejadorSalas {
         String msgAviso = "#" + nombreSala + " El jugador " + cliente.getNombreUsuario() + " está LISTO (" + listos.size() + "/3 necesarios).";
         manejadorMensajes.enrutarMensaje(cliente, msgAviso);
 
-        // si juntamos 3 o mas arranca
         if (listos.size() >= 3) {
             iniciarPartidaEnSala(nombreSala);
         }
     }
 
-    // crea la sesion de juego y busca a los clientes reales
+    // inicia la partida en la sala indicada
     private void iniciarPartidaEnSala(String nombreSala) {
         Integer grupoId = grupoDB.getGrupoId(nombreSala);
         if (grupoId == null) return;
@@ -159,7 +158,6 @@ public class ManejadorSalas {
         List<UnCliente> jugadoresConectados = new ArrayList<>();
 
         for (String nombre : nombresMiembros) {
-            // busca el objeto cliente para pasarlo al juego
             UnCliente c = ServidorMulti.buscarClientePorNombre(nombre); 
             if (c != null && nombreSala.equals(c.obtenerSalaActual())) {
                 jugadoresConectados.add(c);
@@ -168,19 +166,16 @@ public class ManejadorSalas {
 
         SesionJuego nuevaPartida = new SesionJuego(jugadoresConectados);
         partidasActivas.put(nombreSala, nuevaPartida);
-        
-        // limpia los votos para la prox
         votosListo.get(nombreSala).clear();
-        
         nuevaPartida.iniciarPartida();
     }
 
-    public void salirDelGrupoActual(UnCliente cliente) { // Sale del grupo actual si está en uno
+    // hace que el cliente salga de su sala actual
+    public void salirDelGrupoActual(UnCliente cliente) { 
         String sala = cliente.obtenerSalaActual();
         if (sala != null) {
             grupoDB.salirGrupo(sala, cliente.getNombreUsuario());
             
-            // quita el voto si se sale
             if (votosListo.containsKey(sala)) {
                 votosListo.get(sala).remove(cliente.getNombreUsuario());
             }
@@ -189,8 +184,8 @@ public class ManejadorSalas {
         }
     }
 
+    // intenta unir al cliente a la sala indicada
     private boolean unirseASala(String nombreSala, UnCliente cliente, DataOutputStream salida) throws IOException {
-        // Intenta unirse a la sala
         String resultado = grupoDB.unirseGrupo(nombreSala, cliente.getNombreUsuario());
         
         if (resultado.contains("Error") || resultado.contains("no existe")) {
@@ -198,29 +193,25 @@ public class ManejadorSalas {
             return false;
         }
         
-        // Actualiza la sala actual del cliente
         cliente.establecerSalaActual(nombreSala);
         salida.writeUTF(resultado + " ¡Has entrado a la sala!");
         return true;
     }
 
+    // crea una sala nueva
     private boolean crearSala(String nombreSala, UnCliente cliente, DataOutputStream salida) throws IOException {
-        // Valida el nombre de la sala
         if (!nombreSala.matches("[a-zA-Z0-9]+")) {
             salida.writeUTF("Error: El nombre de la sala solo puede contener letras y números.");
             return false;
         }
 
-        // Intenta crear la sala
         String resultadoCreacion = grupoDB.crearGrupo(nombreSala);
 
-        // Checa si hubo un error al crear la sala
         if (resultadoCreacion.contains("Error") || resultadoCreacion.contains("ya existe")) {
             salida.writeUTF(resultadoCreacion + " Intenta de nuevo, hubo un error o el nombre ya es usado.");
             return false;
         }
 
-        // Se une automáticamente a la sala creada
         if (unirseASala(nombreSala, cliente, salida)) {
             salida.writeUTF(resultadoCreacion + " Te has unido automáticamente.");
             return true;
@@ -230,7 +221,7 @@ public class ManejadorSalas {
         }
     }
 
-    // Muestra el menú principal de salas al cliente
+    // muestra el menú principal de salas
     public void mostrarMenuSalaPrincipal(UnCliente cliente, DataOutputStream salida) throws IOException {
         String estado = cliente.estaLogueado() ? "Logueado" : "Invitado (Solo chat)";
         String mensajeInvitado = cliente.estaLogueado() ? "" : " (No puedes crear salas)";
@@ -247,17 +238,28 @@ public class ManejadorSalas {
         cliente.establecerEstadoActual(EstadoMenu.MENU_SALA_PRINCIPAL);
     }
 
-    // Muestra la lista de salas disponibles para unirse
+    // muestra las salas disponibles para unirse
     public void mostrarSalasDisponibles(UnCliente cliente, DataOutputStream salida) throws IOException {
-        List<String> salas = grupoDB.obtenerNombresDeGrupos();
+
+        Map<String, Integer> salas = grupoDB.obtenerSalasDisponibles();
         
-        StringBuilder lista = new StringBuilder("\n--- SALAS DISPONIBLES ---\n");
+        StringBuilder lista = new StringBuilder("\n--- SALAS DISPONIBLES (Máx 6) ---\n");
+        
         if (salas.isEmpty()) {
             lista.append("No hay salas disponibles. ¡Crea una con la opción 2!\n");
         } else {
             int contador = 1;
-            for (String sala : salas) {
-                lista.append(contador).append(". ").append(sala).append("\n");
+            // Iteramos sobre el mapa
+            for (Map.Entry<String, Integer> entry : salas.entrySet()) {
+                String nombreSala = entry.getKey();
+                int cantidadJugadores = entry.getValue();
+                
+                lista.append(contador)
+                     .append(". ")
+                     .append(nombreSala)
+                     .append(" (")
+                     .append(cantidadJugadores)
+                     .append("/6)\n"); // Formato (x/6)
                 contador++;
             }
         }
@@ -268,14 +270,13 @@ public class ManejadorSalas {
         cliente.establecerEstadoActual(EstadoMenu.MENU_UNIRSE_SALA);
     }
 
-    // Muestra la interfaz de chat activa en la sala
     public void mostrarInterfazSalaActiva(UnCliente cliente, DataOutputStream salida) throws IOException {
         String limite = "Sin límite de mensajes."; 
         
         String menu = "\n" +
                       "--- SALA ACTIVA: #" + cliente.obtenerSalaActual() + " ---\n" +
                       "  * Escribe tu mensaje y presiona Enter.\n" +
-                      "  * Escribe /listo para votar iniciar partida (min 3).\n" + // para votar iniciar
+                      "  * Escribe /listo para votar iniciar partida (min 3).\n" + 
                       "  * Para volver al menú principal de salas: /salir\n" +
                       "  " + limite + "\n" +
                       "----------------------------------------------------\n" +
