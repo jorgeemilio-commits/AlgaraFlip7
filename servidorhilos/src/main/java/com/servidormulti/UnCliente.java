@@ -105,16 +105,23 @@ public class UnCliente implements Runnable {
                     procesarAuth(mensaje, salida);
                 }
                 
-            } catch (Exception ex) { // El cliente se ha desconectado o hubo un error
+            } catch (Exception ex) { 
+                // El cliente se ha desconectado o hubo un error
                 System.out.println("Cliente " + this.nombreUsuario + " se ha desconectado.");
+                
+                // Salir de la sala actual antes de eliminar al cliente
                 if (this.salaActual != null) {
                     manejadorSalas.salirDelGrupoActual(this);
                 }
+                
                 ServidorMulti.clientes.remove(this.clienteID); // Elimina al cliente de la lista activa
+                
                 try {
                     this.entrada.close();
                     this.salida.close();
-                } catch (IOException e) { e.printStackTrace(); } // Cierra flujos
+                } catch (IOException e) { 
+                    e.printStackTrace(); 
+                }
                 break;
             }
         }
@@ -164,7 +171,6 @@ public class UnCliente implements Runnable {
                     salida, 
                     this
                 );
-                
                 // Limpia los datos temporales
                 limpiarTemporales(); 
                 
