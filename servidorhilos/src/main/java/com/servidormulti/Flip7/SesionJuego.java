@@ -57,6 +57,14 @@ public class SesionJuego {
             broadcastMensaje("<" + remitente.getNombreUsuario() + ">: " + mensaje);
             return; // Terminamos aquí, no procesamos como comando.
         }
+        String[] partes = mensaje.trim().split("\\s+");
+        String comando = partes[0].toLowerCase();
+
+        if (comando.equals("/puntuacion")) {
+            String reporte = obtenerReportePuntuacion();
+            enviarMensajePrivado(remitente, reporte);
+            return;
+        }
 
         UnCliente clienteActual = clientesEnSala.get(indiceTurnoActual);
         if (!remitente.getClienteID().equals(clienteActual.getClienteID())) {
@@ -67,8 +75,10 @@ public class SesionJuego {
 
         Jugador jugadorActual = jugadores.get(remitente.getClienteID());
 
-        String[] partes = mensaje.trim().split("\\s+");
-        String comando = partes[0].toLowerCase();
+        /*
+         * String[] partes = mensaje.trim().split("\\s+");
+         * String comando = partes[0].toLowerCase();
+         */
 
         if (esperandoObjetivo) {
             if (comando.equals("/usar")) {
@@ -96,7 +106,8 @@ public class SesionJuego {
                 enviarMensajePrivado(remitente, reporte);
                 return;
             default:
-                enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar, /puntiacion o escribe normal para chatear.");
+                enviarMensajePrivado(remitente,
+                        "Comando no válido. Usa /jalar, /parar, /puntiacion o escribe normal para chatear.");
         }
     }
 
@@ -137,7 +148,7 @@ public class SesionJuego {
                 return;
             }
             enviarMensajePrivado(cliente, "Tu mano actual: " + jugador.obtenerCartasEnMano());
-            enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
+            enviarMensajePrivado(cliente, "¿Quieres /jalar otra, /parar o /puntuacion?");
         }
     }
 
