@@ -98,6 +98,9 @@ public class ManejadorSalas {
                 if (mensaje.trim().equalsIgnoreCase("/salir")) { 
                     salirDelGrupoActual(cliente);
                     mostrarMenuSalaPrincipal(cliente, salida);
+                } else if (mensaje.trim().equalsIgnoreCase("/jugadores") || mensaje.trim().equalsIgnoreCase("/miembros")) {
+                    // Comando para ver jugadores en la sala
+                    mostrarJugadoresEnSala(cliente, salida);
                 } else {
                     String nombreSala = cliente.obtenerSalaActual();
                     if (nombreSala != null) {  
@@ -109,6 +112,8 @@ public class ManejadorSalas {
                         } else {
                             if (mensaje.trim().equalsIgnoreCase("/listo")) {
                                 manejarComandoListo(cliente, nombreSala);
+                            } else if (mensaje.trim().equalsIgnoreCase("/nolisto")) {
+                                manejarComandoNoListo(cliente, nombreSala);
                             } else {
                                 String mensajeSala = "#" + nombreSala + " " + mensaje;
                                 manejadorMensajes.enrutarMensaje(cliente, mensajeSala);
@@ -129,6 +134,47 @@ public class ManejadorSalas {
         }
     }
 
+    // Muestra los jugadores que están en la sala actual
+    private void mostrarJugadoresEnSala(UnCliente cliente, DataOutputStream salida) throws IOException {
+        String nombreSala = cliente.obtenerSalaActual();
+        if (nombreSala == null) {
+            salida.writeUTF("Error: No estás en una sala.");
+            return;
+        }
+
+        Integer grupoId = grupoDB.getGrupoId(nombreSala);
+        if (grupoId == null) {
+            salida.writeUTF("Error: La sala no existe.");
+            return;
+        }
+
+        List<String> nombresMiembros = grupoDB.getMiembrosGrupo(grupoId);
+        
+        StringBuilder mensaje = new StringBuilder("\n--- JUGADORES EN LA SALA: " + nombreSala + " ---\n");
+        
+        if (nombresMiembros.isEmpty()) {
+            mensaje.append("No hay jugadores en esta sala.\n");
+        } else {
+            mensaje.append("Total: ").append(nombresMiembros.size()).append("/6\n");
+            mensaje.append("--------------------\n");
+            
+            int contador = 1;
+            for (String nombre : nombresMiembros) {
+                // Marcar si es el usuario actual
+                String marcador = nombre.equals(cliente.getNombreUsuario()) ? " (TÚ)" : "";
+                
+                mensaje.append(contador).append(". ")
+                       .append(nombre)
+                       .append(marcador)
+                       .append("\n");
+                contador++;
+            }
+        }
+        mensaje.append("------------------------------------\n");
+        
+        salida.writeUTF(mensaje.toString());
+    }
+
     // maneja el comando /listo del cliente
     private void manejarComandoListo(UnCliente cliente, String nombreSala) throws IOException {
         votosListo.putIfAbsent(nombreSala, new HashSet<>());
@@ -147,6 +193,24 @@ public class ManejadorSalas {
         if (listos.size() >= 3) {
             iniciarPartidaEnSala(nombreSala);
         }
+    }
+
+    // maneja el comando /nolisto del cliente
+    private void manejarComandoNoListo(UnCliente cliente, String nombreSala) throws IOException {
+        votosListo.putIfAbsent(nombreSala, new HashSet<>());
+        Set<String> listos = votosListo.get(nombreSala);
+
+        if (!listos.contains(cliente.getNombreUsuario())) {
+            cliente.getSalida().writeUTF("No estabas marcado como listo.");
+            return;
+        }
+        
+        listos.remove(cliente.getNombreUsuario());
+        
+        String msgAviso = "#" + nombreSala + " El jugador " + cliente.getNombreUsuario() + " ya NO está listo (" + listos.size() + "/3 necesarios).";
+        manejadorMensajes.enrutarMensaje(cliente, msgAviso);
+        
+        cliente.getSalida().writeUTF("Has cancelado tu voto de listo.");
     }
 
     // inicia la partida en la sala indicada
@@ -276,7 +340,9 @@ public class ManejadorSalas {
         String menu = "\n" +
                       "--- SALA ACTIVA: #" + cliente.obtenerSalaActual() + " ---\n" +
                       "  * Escribe tu mensaje y presiona Enter.\n" +
-                      "  * Escribe /listo para votar iniciar partida (min 3).\n" + 
+                      "  * Escribe /jugadores para ver quién está en la sala.\n" +
+                      "  * Escribe /listo para votar iniciar partida (min 3).\n" +
+                      "  * Escribe /nolisto para cancelar tu voto.\n" +
                       "  * Para volver al menú principal de salas: /salir\n" +
                       "  " + limite + "\n" +
                       "----------------------------------------------------\n" +
