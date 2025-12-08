@@ -96,7 +96,7 @@ public class SesionJuego {
                 enviarMensajePrivado(remitente, reporte);
                 return;
             default:
-                enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar o escribe normal para chatear.");
+                enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar, /puntiacion o escribe normal para chatear.");
         }
     }
 

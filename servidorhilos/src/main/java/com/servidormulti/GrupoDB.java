@@ -4,9 +4,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement; // Importado para crear sentencias simples
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class GrupoDB {
 
@@ -33,12 +34,40 @@ public class GrupoDB {
     }
 
     /**
+     * Crea un nuevo grupo en la base de datos.
+     */
+    public String crearGrupo(String nombreGrupo) {
+        if (getGrupoId(nombreGrupo) != null) {
+            return "Error: El grupo '" + nombreGrupo + "' ya existe.";
+        }
+
+        String sql = "INSERT INTO grupos (nombre) VALUES (?)";
+        Connection conn = ConexionDB.conectar();
+        if (conn == null) return "Error de conexión.";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, nombreGrupo);
+            int filas = pstmt.executeUpdate();
+            if (filas > 0) {
+                return "Sala '" + nombreGrupo + "' creada exitosamente.";
+            } else {
+                return "Error al crear la sala.";
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al crear grupo: " + e.getMessage());
+            return "Error interno al crear grupo.";
+        } finally {
+            ConexionDB.cerrarConexion(conn);
+        }
+    }
+
+    /**
      * Une un usuario a un grupo.
      */
     public String unirseGrupo(String nombreGrupo, String nombreUsuario) {
         Integer grupoId = getGrupoId(nombreGrupo);
         if (grupoId == null) {
-            return "Error: La sala '" + nombreGrupo + "' no existe.";
+            return "Error: El grupo '" + nombreGrupo + "' no existe.";
         }
         
         String sqlInsert = "INSERT OR IGNORE INTO grupos_miembros (grupo_id, usuario_nombre) VALUES (?, ?)";
@@ -46,7 +75,6 @@ public class GrupoDB {
         if (conn == null) return "Error de conexión.";
 
         try (PreparedStatement pstmt = conn.prepareStatement(sqlInsert)) {
-            
             pstmt.setInt(1, grupoId);
             pstmt.setString(2, nombreUsuario);
             int filasAfectadas = pstmt.executeUpdate();
@@ -63,32 +91,6 @@ public class GrupoDB {
             ConexionDB.cerrarConexion(conn);
         }
     }
-    
-    /**
-     * Crea un nuevo grupo/sala en la base de datos.
-     */
-    public String crearGrupo(String nombreGrupo) {
-        String sqlInsert = "INSERT INTO grupos (nombre) VALUES (?)";
-        Connection conn = ConexionDB.conectar();
-        if (conn == null) return "Error de conexión.";
-
-        try (PreparedStatement insertStmt = conn.prepareStatement(sqlInsert)) {
-            insertStmt.setString(1, nombreGrupo);
-            insertStmt.executeUpdate();
-            
-            return "Sala '" + nombreGrupo + "' creada exitosamente.";
-            
-        } catch (SQLException e) {
-            if (e.getMessage().contains("UNIQUE constraint failed")) {
-                return "Error: El nombre de sala '" + nombreGrupo + "' ya está en uso.";
-            }
-            System.err.println("Error al crear grupo: " + e.getMessage());
-            return "Error interno al crear la sala.";
-        } finally {
-            ConexionDB.cerrarConexion(conn);
-        }
-    }
-
 
     /**
      * Saca un usuario de un grupo. 
@@ -98,19 +100,16 @@ public class GrupoDB {
             return "Error: No puedes salir del grupo 'Todos'.";
         }
 
-        // Verificar si el grupo existe
         Integer grupoId = getGrupoId(nombreGrupo);
         if (grupoId == null) {
             return "Error: El grupo '" + nombreGrupo + "' no existe.";
         }
 
-        // Eliminar al usuario del grupo en la base de datos
         String sqlDeleteMiembro = "DELETE FROM grupos_miembros WHERE grupo_id = ? AND usuario_nombre = ?";
         Connection conn = ConexionDB.conectar();
         if (conn == null) return "Error de conexión.";
 
         try (PreparedStatement pstmtMiembro = conn.prepareStatement(sqlDeleteMiembro)) {
-            
             pstmtMiembro.setInt(1, grupoId);
             pstmtMiembro.setString(2, nombreUsuario);
             int filasAfectadas = pstmtMiembro.executeUpdate();
@@ -127,7 +126,6 @@ public class GrupoDB {
             ConexionDB.cerrarConexion(conn);
         }
     }
-
 
     /**
      * Obtiene una lista de todos los miembros de un grupo.
@@ -150,27 +148,42 @@ public class GrupoDB {
         }
         return miembros;
     }
-    
+
     /**
-     * Obtiene una lista de los nombres de grupos, ORDENADOS por ID.
+     * Obtiene un mapa con el nombre de la sala y la cantidad actual de jugadores.
+     * Filtra automáticamente las salas que ya tienen 6 o más jugadores.
      */
-    public List<String> obtenerNombresDeGrupos() {
-        List<String> nombres = new ArrayList<>();
-        // ORDER BY id para que los números del menú no cambien
-        String sql = "SELECT nombre FROM grupos WHERE nombre != 'Todos' ORDER BY id ASC"; 
+    public Map<String, Integer> obtenerSalasDisponibles() {
+        Map<String, Integer> salas = new HashMap<>();
+        String sql = "SELECT g.nombre, COUNT(gm.usuario_nombre) as cantidad " +
+                     "FROM grupos g " +
+                     "LEFT JOIN grupos_miembros gm ON g.id = gm.grupo_id " +
+                     "WHERE g.nombre <> 'Todos' " + 
+                     "GROUP BY g.id, g.nombre " +
+                     "HAVING cantidad < 6";
+
         Connection conn = ConexionDB.conectar();
-        if (conn == null) return nombres;
-        
-        try (Statement stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery(sql);
+        if (conn == null) return salas;
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                nombres.add(rs.getString("nombre"));
+                String nombre = rs.getString("nombre");
+                int cantidad = rs.getInt("cantidad");
+                salas.put(nombre, cantidad);
             }
         } catch (SQLException e) {
-            System.err.println("Error al obtener nombres de grupos: " + e.getMessage());
+            System.err.println("Error al obtener salas disponibles: " + e.getMessage());
         } finally {
             ConexionDB.cerrarConexion(conn);
         }
-        return nombres;
+        return salas;
+    }
+    
+    /**
+     * Obtiene una lista con los nombres de todas las salas disponibles.
+     */
+    public List<String> obtenerNombresDeGrupos() {
+        return new ArrayList<>(obtenerSalasDisponibles().keySet());
     }
 }
