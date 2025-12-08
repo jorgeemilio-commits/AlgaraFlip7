@@ -9,14 +9,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ServidorMulti {
 
     static ConcurrentHashMap<String, UnCliente> clientes = new ConcurrentHashMap<String,UnCliente>();
-    static AtomicInteger contadorClientes = new AtomicInteger(0); // Recomendado
+    static AtomicInteger contadorClientes = new AtomicInteger(0);
 
     public static void main(String[] args) throws IOException {
+        
+        // Limpiar todas las salas al iniciar el servidor
+        System.out.println("Limpiando salas anteriores...");
+        GrupoDB grupoDB = new GrupoDB();
+        grupoDB.limpiarTodasLasSalas();
         
         ContextoServidor contexto = new ContextoServidor(clientes);
         System.out.println("Servicios del servidor inicializados.");
         
         try (ServerSocket servidorSocket = new ServerSocket(8081)) {
+            System.out.println("Servidor escuchando en el puerto 8081...");
             
             while (true) {
                 Socket s = servidorSocket.accept();
@@ -33,6 +39,7 @@ public class ServidorMulti {
             System.err.println("Error al iniciar el servidor: " + e.getMessage());
         }
     }
+    
     public static UnCliente buscarClientePorNombre(String nombre) {
         for (UnCliente c : clientes.values()) {
             if (c.getNombreUsuario().equalsIgnoreCase(nombre)) {
