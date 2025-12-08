@@ -99,7 +99,7 @@ public class ManejadorSalas {
                     salirDelGrupoActual(cliente);
                     mostrarMenuSalaPrincipal(cliente, salida);
                 } else if (mensaje.trim().equalsIgnoreCase("/jugadores") || mensaje.trim().equalsIgnoreCase("/miembros")) {
-                    // Comando para ver jugadores en la sala
+                    // NUEVO: Comando para ver jugadores en la sala
                     mostrarJugadoresEnSala(cliente, salida);
                 } else {
                     String nombreSala = cliente.obtenerSalaActual();
@@ -134,7 +134,7 @@ public class ManejadorSalas {
         }
     }
 
-    // Muestra los jugadores que están en la sala actual
+    // NUEVO: Muestra los jugadores que están en la sala actual
     private void mostrarJugadoresEnSala(UnCliente cliente, DataOutputStream salida) throws IOException {
         String nombreSala = cliente.obtenerSalaActual();
         if (nombreSala == null) {
@@ -245,6 +245,20 @@ public class ManejadorSalas {
             }
 
             cliente.establecerSalaActual(null);
+            
+            // Verificar si la sala quedó vacía y eliminarla
+            Integer grupoId = grupoDB.getGrupoId(sala);
+            if (grupoId != null) {
+                List<String> miembros = grupoDB.getMiembrosGrupo(grupoId);
+                if (miembros.isEmpty()) {
+                    grupoDB.eliminarGrupo(sala);
+                    System.out.println("Sala '" + sala + "' eliminada (sin miembros).");
+                    
+                    // Limpiar datos asociados a la sala
+                    partidasActivas.remove(sala);
+                    votosListo.remove(sala);
+                }
+            }
         }
     }
 

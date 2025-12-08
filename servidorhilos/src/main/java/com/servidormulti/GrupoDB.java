@@ -128,6 +128,56 @@ public class GrupoDB {
     }
 
     /**
+     * Elimina un grupo de la base de datos.
+     * Los miembros se eliminan automáticamente por CASCADE.
+     */
+    public boolean eliminarGrupo(String nombreGrupo) {
+        if (nombreGrupo.equalsIgnoreCase("Todos")) {
+            System.err.println("No se puede eliminar el grupo 'Todos'.");
+            return false;
+        }
+
+        Integer grupoId = getGrupoId(nombreGrupo);
+        if (grupoId == null) {
+            return false;
+        }
+
+        String sql = "DELETE FROM grupos WHERE id = ?";
+        Connection conn = ConexionDB.conectar();
+        if (conn == null) return false;
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, grupoId);
+            int filasAfectadas = pstmt.executeUpdate();
+            return filasAfectadas > 0;
+        } catch (SQLException e) {
+            System.err.println("Error al eliminar grupo: " + e.getMessage());
+            return false;
+        } finally {
+            ConexionDB.cerrarConexion(conn);
+        }
+    }
+
+    /**
+     * Limpia todos los grupos excepto 'Todos'.
+     * Se usa al iniciar el servidor.
+     */
+    public void limpiarTodasLasSalas() {
+        String sql = "DELETE FROM grupos WHERE nombre != 'Todos'";
+        Connection conn = ConexionDB.conectar();
+        if (conn == null) return;
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            int filasAfectadas = pstmt.executeUpdate();
+            System.out.println("Todas las salas han sido limpiadas. Salas eliminadas: " + filasAfectadas);
+        } catch (SQLException e) {
+            System.err.println("Error al limpiar salas: " + e.getMessage());
+        } finally {
+            ConexionDB.cerrarConexion(conn);
+        }
+    }
+
+    /**
      * Obtiene una lista de todos los miembros de un grupo.
      */
     public List<String> getMiembrosGrupo(int grupoId) {
