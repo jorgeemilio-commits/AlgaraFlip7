@@ -31,14 +31,15 @@ public class SesionJuego {
 
     // Lógica separada para iniciar partida vs siguiente ronda
     public void iniciarPartida() {
-        if (juegoIniciado) return;
+        if (juegoIniciado)
+            return;
 
         // Reinicio TOTAL (Solo cuando escriben /listo al principio o tras ganar)
         jugadores.clear();
         for (UnCliente c : clientesEnSala) {
             jugadores.put(c.getClienteID(), new Jugador(c.getNombreUsuario()));
         }
-        
+
         configurarYArrancarRonda("--- ¡LA PARTIDA DE FLIP7 HA COMENZADO! ---");
     }
 
@@ -61,28 +62,29 @@ public class SesionJuego {
         if (!clientesEnSala.isEmpty()) {
             indiceTurnoActual = new Random().nextInt(clientesEnSala.size());
         }
-        
+
         juegoIniciado = true;
-        esperandoObjetivo = false; 
+        esperandoObjetivo = false;
 
         broadcastMensaje(mensajeInicio);
         anunciarTurno();
     }
 
-   public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
-        if (!juegoIniciado) return;
+    public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
+        if (!juegoIniciado)
+            return;
 
         // [NUEVO] - Habilitar Chat Global
         // Si no empieza con "/", es chat y se envía a todos.
         if (!mensaje.trim().startsWith("/")) {
             broadcastMensaje("<" + remitente.getNombreUsuario() + ">: " + mensaje);
-            return; 
+            return;
         }
 
         String[] partes = mensaje.trim().split("\\s+");
         String comando = partes[0].toLowerCase();
 
-       // Permitir ver puntuación siempre
+        // Permitir ver puntuación siempre
         if (comando.equals("/puntuacion")) {
             enviarMensajePrivado(remitente, obtenerReportePuntuacion());
             return;
@@ -117,7 +119,8 @@ public class SesionJuego {
                 accionParar(remitente, jugadorActual);
                 break;
             default:
-                enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar, /puntuacion o escribe normal para chatear.");
+                enviarMensajePrivado(remitente,
+                        "Comando no válido. Usa /jalar, /parar, /puntuacion o escribe normal para chatear.");
         }
     }
 
@@ -159,7 +162,7 @@ public class SesionJuego {
             }
 
             enviarMensajePrivado(cliente, "Tu mano actual: " + jugador.obtenerCartasEnMano());
-            siguienteTurno(); 
+            siguienteTurno();
         }
     }
 
@@ -169,50 +172,76 @@ public class SesionJuego {
         StringBuilder listaObjetivos = new StringBuilder();
         int contadorValidos = 0;
 
-        // Construir listas filtradas según la carta
         if (nombreCarta.equals("Second Chance") && jugador.tieneSecondChance()) {
+
             requiereObjetivo = true;
             listaObjetivos.append("--- JUGADORES DISPONIBLES ---\n");
+
             for (UnCliente c : clientesEnSala) {
-                if (!c.getClienteID().equals(cliente.getClienteID())) {
+
+                if (c.getClienteID().equals(cliente.getClienteID()))
+                    continue; // no tú mismo
+
+                Jugador j = jugadores.get(c.getClienteID());
+
+                // Solo jugadores activos y sin Second Chance
+                if (!j.tieneBUST() && !j.sePlanto() && !j.tieneSecondChance()) {
                     listaObjetivos.append(" - ").append(c.getNombreUsuario()).append("\n");
                     contadorValidos++;
                 }
             }
-        } else if (nombreCarta.equals("Freeze") || nombreCarta.equals("Flip Three")) {
+
+            // Si no hay candidatos → descartar la carta
+            if (contadorValidos == 0) {
+                broadcastMensaje(cliente.getNombreUsuario()
+                        + " sacó Second Chance pero no hay jugadores activos disponibles. Se DESCARTA.");
+                enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
+                return;
+            }
+        }
+
+        else if (nombreCarta.equals("Freeze") || nombreCarta.equals("Flip Three")) {
+
             requiereObjetivo = true;
             listaObjetivos.append("--- VÍCTIMAS DISPONIBLES ---\n");
+
             for (UnCliente c : clientesEnSala) {
                 Jugador j = jugadores.get(c.getClienteID());
-                // Filtro: No atacar a plantados ni BUST
+
                 if (!j.sePlanto() && !j.tieneBUST()) {
                     listaObjetivos.append(" - ").append(c.getNombreUsuario());
-                    if (c.getClienteID().equals(cliente.getClienteID())) listaObjetivos.append(" [TÚ]");
+                    if (c.getClienteID().equals(cliente.getClienteID()))
+                        listaObjetivos.append(" [TÚ]");
                     listaObjetivos.append("\n");
                     contadorValidos++;
                 }
             }
-        } else if (nombreCarta.equals("Second Chance") && !jugador.tieneSecondChance()) {
-            // Auto-asignar si no tiene vida extra
+
+            // Si nadie es atacable
+            if (contadorValidos == 0) {
+                broadcastMensaje(cliente.getNombreUsuario() + " sacó " + nombreCarta
+                        + " pero no hay jugadores activos disponibles.");
+                enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
+                return;
+            }
+        }
+
+        else if (nombreCarta.equals("Second Chance") && !jugador.tieneSecondChance()) {
+
             jugador.setTieneSecondChance(true);
-            broadcastMensaje(cliente.getNombreUsuario() + " obtuvo Second Chance.");
+            broadcastMensaje(cliente.getNombreUsuario() + " obtuvo una Second Chance.");
             enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
             return;
         }
 
-        // Si requiere objetivo, validar si existen candidatos
         if (requiereObjetivo) {
-            if (contadorValidos > 0) {
-                this.accionPendiente = carta;
-                this.esperandoObjetivo = true;
-                enviarMensajePrivado(cliente, "¡Sacaste " + nombreCarta + "!");
-                enviarMensajePrivado(cliente, listaObjetivos.toString());
-                enviarMensajePrivado(cliente, "Usa: /usar [Nombre]");
-            } else {
-                // Descarte automático si nadie es válido
-                broadcastMensaje(cliente.getNombreUsuario() + " sacó " + nombreCarta + " pero se descarta (sin objetivos).");
-                enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
-            }
+
+            this.accionPendiente = carta;
+            this.esperandoObjetivo = true;
+
+            enviarMensajePrivado(cliente, "¡Sacaste " + nombreCarta + "!");
+            enviarMensajePrivado(cliente, listaObjetivos.toString());
+            enviarMensajePrivado(cliente, "Usa: /usar [Nombre]");
         }
     }
 
@@ -256,7 +285,7 @@ public class SesionJuego {
         this.esperandoObjetivo = false;
         this.accionPendiente = null;
 
-        //  El turno del atacante debe terminar después de usar la
+        // El turno del atacante debe terminar después de usar la
         // acción.
         siguienteTurno();
     }
@@ -300,26 +329,26 @@ public class SesionJuego {
         return true;
     }
 
-   private void finalizarRonda() {
+    private void finalizarRonda() {
         broadcastMensaje("\n--- FIN DE LA RONDA ---");
-        
+
         Jugador ganadorDelJuego = null;
         int maxPuntuacionGlobal = -1;
         StringBuilder resumen = new StringBuilder("Resultados:\n");
-        
+
         for (UnCliente c : clientesEnSala) {
             Jugador j = jugadores.get(c.getClienteID());
             int puntosRonda = j.tieneBUST() ? 0 : calculadora.calcularPuntuacion(j.obtenerCartasEnMano());
-            
+
             // Acumular puntos
             j.sumarPuntos(puntosRonda);
             int total = j.obtenerPuntuacionTotal();
 
             resumen.append(" -> ").append(c.getNombreUsuario())
-                   .append(": +").append(puntosRonda)
-                   .append(" (Total: ").append(total).append(")\n");
-            
-            //  Checar si alguien ganó la partida completa (>= 200)
+                    .append(": +").append(puntosRonda)
+                    .append(" (Total: ").append(total).append(")\n");
+
+            // Checar si alguien ganó la partida completa (>= 200)
             if (total >= 200) {
                 if (total > maxPuntuacionGlobal) {
                     maxPuntuacionGlobal = total;
@@ -329,7 +358,7 @@ public class SesionJuego {
         }
         broadcastMensaje(resumen.toString());
 
-        juegoIniciado = false; 
+        juegoIniciado = false;
 
         if (ganadorDelJuego != null) {
             // Fin definitivo del juego
@@ -341,12 +370,12 @@ public class SesionJuego {
         } else {
             // [NUEVO] Continuar siguiente ronda automáticamente
             broadcastMensaje("Nadie ha llegado a 200 puntos. La siguiente ronda comienza en 15 segundos...");
-            
+
             new Thread(() -> {
                 try {
                     Thread.sleep(15000); // 15 segundos
                     broadcastMensaje("¡Tiempo fuera! Preparando cartas...");
-                    iniciarSiguienteRonda(); 
+                    iniciarSiguienteRonda();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
