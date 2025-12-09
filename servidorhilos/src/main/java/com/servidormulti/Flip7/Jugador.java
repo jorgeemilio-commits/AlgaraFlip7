@@ -9,9 +9,8 @@ public class Jugador {
     private boolean tieneBUST;
     private boolean sePlanto;
     private int puntuacionTotal;
-    
-   
-    private boolean tieneSecondChance; 
+
+    private boolean tieneSecondChance;
     private boolean estaCongelado;
 
     public Jugador(String nombreUsuario) {
@@ -19,19 +18,19 @@ public class Jugador {
         this.cartasEnMano = new ArrayList<>();
         this.tieneBUST = false;
         this.sePlanto = false;
-        this.tieneSecondChance = false; 
+        this.tieneSecondChance = false;
         this.estaCongelado = false; // Inicializamos
         this.puntuacionTotal = 0;
     }
 
-    // Comando /parar 
+    // Comando /parar
     public void plantarse() {
         if (!tieneBUST) {
             this.sePlanto = true;
         }
     }
 
-    //  Método para Congelar 
+    // Método para Congelar
     public void congelar() {
         this.estaCongelado = true;
         plantarse(); // Al congelarse, fuerza el STAY
@@ -52,14 +51,12 @@ public class Jugador {
         if (verificarSiCausaBUST(nuevaCarta)) {
             if (this.tieneSecondChance) {
                 this.tieneSecondChance = false; // Consume la vida extra
-                // El jugador se queda con la carta que causó conflicto 
-                this.cartasEnMano.add(nuevaCarta); 
-                return true; 
+                return true;
             } else {
-                // BUST definitivo. Anular puntos y finalizar turno 
-                this.cartasEnMano.clear(); 
+                // BUST definitivo. Anular puntos y finalizar turno
+                this.cartasEnMano.clear();
                 this.tieneBUST = true;
-                this.sePlanto = true; 
+                this.sePlanto = true;
                 return false;
             }
         } else {
@@ -69,16 +66,16 @@ public class Jugador {
         }
     }
 
-    // Método que implementa detectar si una carta numérica repite valor 
+    // Método que implementa detectar si una carta numérica repite valor
     private boolean verificarSiCausaBUST(Carta nuevaCarta) {
         for (Carta carta : cartasEnMano) {
             if (carta.obtenerTipo() == TipoCarta.NUMERICA && carta.obtenerValor() == nuevaCarta.obtenerValor()) {
-                return true; 
+                return true;
             }
         }
         return false;
     }
-    
+
     // Reiniciar estado para nueva ronda
     public void reiniciarParaRondaNueva() {
         this.cartasEnMano.clear();
@@ -93,17 +90,36 @@ public class Jugador {
         this.puntuacionTotal += puntos;
     }
 
-    public int obtenerPuntuacionTotal() { 
-        return puntuacionTotal; 
+    public int obtenerPuntuacionTotal() {
+        return puntuacionTotal;
     }
 
-    public String obtenerNombreUsuario() { return nombreUsuario; }
-    public boolean tieneBUST() { return tieneBUST; }
-    public boolean sePlanto() { return sePlanto; }
-    public List<Carta> obtenerCartasEnMano() { return cartasEnMano; }
-    
-    //  Getters y Setters
-    public void setTieneSecondChance(boolean valor) { this.tieneSecondChance = valor; }
-    public boolean tieneSecondChance() { return tieneSecondChance; }
-    public boolean estaCongelado() { return estaCongelado; }
+    public String obtenerNombreUsuario() {
+        return nombreUsuario;
+    }
+
+    public boolean tieneBUST() {
+        return tieneBUST;
+    }
+
+    public boolean sePlanto() {
+        return sePlanto;
+    }
+
+    public List<Carta> obtenerCartasEnMano() {
+        return cartasEnMano;
+    }
+
+    // Getters y Setters
+    public void setTieneSecondChance(boolean valor) {
+        this.tieneSecondChance = valor;
+    }
+
+    public boolean tieneSecondChance() {
+        return tieneSecondChance;
+    }
+
+    public boolean estaCongelado() {
+        return estaCongelado;
+    }
 }
