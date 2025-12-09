@@ -29,21 +29,43 @@ public class SesionJuego {
         this.manejadorAcciones = new ManejadorAcciones();
     }
 
+    // Lógica separada para iniciar partida vs siguiente ronda
     public void iniciarPartida() {
-        if (juegoIniciado)
-            return;
+        if (juegoIniciado) return;
 
+        // Reinicio TOTAL (Solo cuando escriben /listo al principio o tras ganar)
         jugadores.clear();
         for (UnCliente c : clientesEnSala) {
             jugadores.put(c.getClienteID(), new Jugador(c.getNombreUsuario()));
         }
+        
+        configurarYArrancarRonda("--- ¡LA PARTIDA DE FLIP7 HA COMENZADO! ---");
+    }
+
+    private void iniciarSiguienteRonda() {
+        if (clientesEnSala.isEmpty()) {
+            juegoIniciado = false;
+            return;
+        }
+
+        // Reinicio PARCIAL (Mantiene puntos acumulados, solo limpia mano y estados)
+        for (Jugador j : jugadores.values()) {
+            j.reiniciarParaRondaNueva();
+        }
+
+        configurarYArrancarRonda("--- INICIANDO SIGUIENTE RONDA ---");
+    }
+
+    private void configurarYArrancarRonda(String mensajeInicio) {
         baraja.reiniciarBaraja();
-        indiceTurnoActual = new Random().nextInt(clientesEnSala.size());
-
+        if (!clientesEnSala.isEmpty()) {
+            indiceTurnoActual = new Random().nextInt(clientesEnSala.size());
+        }
+        
         juegoIniciado = true;
-        esperandoObjetivo = false; // Resetear estado de acciones
+        esperandoObjetivo = false; 
 
-        broadcastMensaje("--- ¡LA PARTIDA DE FLIP7 HA COMENZADO! ---");
+        broadcastMensaje(mensajeInicio);
         anunciarTurno();
     }
 
