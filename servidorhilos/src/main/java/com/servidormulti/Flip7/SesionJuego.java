@@ -166,16 +166,13 @@ public class SesionJuego {
     private void procesarCartaAccion(UnCliente cliente, Jugador jugador, Carta carta) {
         String nombreCarta = carta.toString();
         boolean requiereObjetivo = false;
-
-        // Lista para guardar nombres de posibles víctimas
         StringBuilder listaObjetivos = new StringBuilder();
         int contadorValidos = 0;
 
-        // Lógica específica para filtrar quién es válido
+        // Construir listas filtradas según la carta
         if (nombreCarta.equals("Second Chance") && jugador.tieneSecondChance()) {
             requiereObjetivo = true;
-            // Para regalar vida, buscamos a cualquiera que NO sea yo
-            listaObjetivos.append("--- JUGADORES DISPONIBLES PARA REGALAR VIDA ---\n");
+            listaObjetivos.append("--- JUGADORES DISPONIBLES ---\n");
             for (UnCliente c : clientesEnSala) {
                 if (!c.getClienteID().equals(cliente.getClienteID())) {
                     listaObjetivos.append(" - ").append(c.getNombreUsuario()).append("\n");
@@ -187,39 +184,33 @@ public class SesionJuego {
             listaObjetivos.append("--- VÍCTIMAS DISPONIBLES ---\n");
             for (UnCliente c : clientesEnSala) {
                 Jugador j = jugadores.get(c.getClienteID());
-                // El único filtro es que NO esté ya plantado o en BUST.
+                // Filtro: No atacar a plantados ni BUST
                 if (!j.sePlanto() && !j.tieneBUST()) {
                     listaObjetivos.append(" - ").append(c.getNombreUsuario());
-
-                    // Añadir la etiqueta [TÚ] si es el jugador actual
-                    if (c.getClienteID().equals(cliente.getClienteID())) {
-                        listaObjetivos.append(" [TÚ]");
-                    }
+                    if (c.getClienteID().equals(cliente.getClienteID())) listaObjetivos.append(" [TÚ]");
                     listaObjetivos.append("\n");
                     contadorValidos++;
                 }
             }
         } else if (nombreCarta.equals("Second Chance") && !jugador.tieneSecondChance()) {
-            // Caso simple: Se la queda él mismo
+            // Auto-asignar si no tiene vida extra
             jugador.setTieneSecondChance(true);
-            broadcastMensaje(cliente.getNombreUsuario() + " se queda con una Second Chance (Vida Extra).");
+            broadcastMensaje(cliente.getNombreUsuario() + " obtuvo Second Chance.");
             enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
             return;
         }
 
+        // Si requiere objetivo, validar si existen candidatos
         if (requiereObjetivo) {
             if (contadorValidos > 0) {
-                // Si hay víctimas, activamos el modo espera y mostramos la lista
                 this.accionPendiente = carta;
                 this.esperandoObjetivo = true;
                 enviarMensajePrivado(cliente, "¡Sacaste " + nombreCarta + "!");
                 enviarMensajePrivado(cliente, listaObjetivos.toString());
-                enviarMensajePrivado(cliente, "Escribe: /usar [Nombre] para aplicarla.");
+                enviarMensajePrivado(cliente, "Usa: /usar [Nombre]");
             } else {
-                // Si NO hay nadie a quien atacar/regalar, la carta se descarta
-                broadcastMensaje(cliente.getNombreUsuario() + " sacó " + nombreCarta
-                        + ", pero no hay objetivos válidos. La carta se descarta.");
-                enviarMensajePrivado(cliente, "No hay nadie a quien aplicarle la carta. Turno continúa.");
+                // Descarte automático si nadie es válido
+                broadcastMensaje(cliente.getNombreUsuario() + " sacó " + nombreCarta + " pero se descarta (sin objetivos).");
                 enviarMensajePrivado(cliente, "¿Quieres /jalar otra o /parar?");
             }
         }
