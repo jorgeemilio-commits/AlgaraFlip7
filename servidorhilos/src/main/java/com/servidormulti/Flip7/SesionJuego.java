@@ -256,7 +256,7 @@ public class SesionJuego {
         this.esperandoObjetivo = false;
         this.accionPendiente = null;
 
-        // CORRECCIÓN CLAVE: El turno del atacante debe terminar después de usar la
+        //  El turno del atacante debe terminar después de usar la
         // acción.
         siguienteTurno();
     }
@@ -300,18 +300,58 @@ public class SesionJuego {
         return true;
     }
 
-    private void finalizarRonda() {
+   private void finalizarRonda() {
         broadcastMensaje("\n--- FIN DE LA RONDA ---");
-        broadcastMensaje("Resultados:");
-
+        
+        Jugador ganadorDelJuego = null;
+        int maxPuntuacionGlobal = -1;
+        StringBuilder resumen = new StringBuilder("Resultados:\n");
+        
         for (UnCliente c : clientesEnSala) {
             Jugador j = jugadores.get(c.getClienteID());
-            int puntos = j.tieneBUST() ? 0 : calculadora.calcularPuntuacion(j.obtenerCartasEnMano());
-            broadcastMensaje(
-                    " -> " + c.getNombreUsuario() + ": " + puntos + " puntos. (" + j.obtenerCartasEnMano() + ")");
+            int puntosRonda = j.tieneBUST() ? 0 : calculadora.calcularPuntuacion(j.obtenerCartasEnMano());
+            
+            // Acumular puntos
+            j.sumarPuntos(puntosRonda);
+            int total = j.obtenerPuntuacionTotal();
+
+            resumen.append(" -> ").append(c.getNombreUsuario())
+                   .append(": +").append(puntosRonda)
+                   .append(" (Total: ").append(total).append(")\n");
+            
+            //  Checar si alguien ganó la partida completa (>= 200)
+            if (total >= 200) {
+                if (total > maxPuntuacionGlobal) {
+                    maxPuntuacionGlobal = total;
+                    ganadorDelJuego = j;
+                }
+            }
         }
-        juegoIniciado = false;
-        broadcastMensaje("Escriban /listo para iniciar otra vez.");
+        broadcastMensaje(resumen.toString());
+
+        juegoIniciado = false; 
+
+        if (ganadorDelJuego != null) {
+            // Fin definitivo del juego
+            broadcastMensaje("\n🏆 ¡JUEGO TERMINADO! 🏆");
+            broadcastMensaje("El ganador es: " + ganadorDelJuego.obtenerNombreUsuario().toUpperCase());
+            broadcastMensaje("Puntuación Final: " + maxPuntuacionGlobal);
+            broadcastMensaje("------------------------------------------");
+            broadcastMensaje("Escriban /listo para iniciar una partida nueva.");
+        } else {
+            // [NUEVO] Continuar siguiente ronda automáticamente
+            broadcastMensaje("Nadie ha llegado a 200 puntos. La siguiente ronda comienza en 15 segundos...");
+            
+            new Thread(() -> {
+                try {
+                    Thread.sleep(15000); // 15 segundos
+                    broadcastMensaje("¡Tiempo fuera! Preparando cartas...");
+                    iniciarSiguienteRonda(); 
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+        }
     }
 
     private void anunciarTurno() {
