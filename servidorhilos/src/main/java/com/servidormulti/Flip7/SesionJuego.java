@@ -173,13 +173,18 @@ public class SesionJuego {
             }
         } else if (nombreCarta.equals("Freeze") || nombreCarta.equals("Flip Three")) {
             requiereObjetivo = true;
-            // Para atacar, buscamos a quienes NO se han plantado ni perdido
             listaObjetivos.append("--- VÍCTIMAS DISPONIBLES ---\n");
             for (UnCliente c : clientesEnSala) {
                 Jugador j = jugadores.get(c.getClienteID());
-                // No me ataco a mí mismo, ni a los que ya terminaron (plantados/bust)
-                if (!c.getClienteID().equals(cliente.getClienteID()) && !j.sePlanto() && !j.tieneBUST()) {
-                    listaObjetivos.append(" - ").append(c.getNombreUsuario()).append("\n");
+                // El único filtro es que NO esté ya plantado o en BUST.
+                if (!j.sePlanto() && !j.tieneBUST()) {
+                    listaObjetivos.append(" - ").append(c.getNombreUsuario());
+
+                    // Añadir la etiqueta [TÚ] si es el jugador actual
+                    if (c.getClienteID().equals(cliente.getClienteID())) {
+                        listaObjetivos.append(" [TÚ]");
+                    }
+                    listaObjetivos.append("\n");
                     contadorValidos++;
                 }
             }
