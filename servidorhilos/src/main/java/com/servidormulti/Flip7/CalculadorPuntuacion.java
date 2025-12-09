@@ -29,7 +29,7 @@ public class CalculadorPuntuacion {
 
         total += bonoPuntos;
 
-        if (valoresUnicos.size() >= 7) {
+        if (valoresUnicos.size() == 7) {
             total += 15;
         }
 
@@ -44,7 +44,7 @@ public class CalculadorPuntuacion {
                 valoresUnicos.add(c.obtenerValor());
             }
         }
-        return valoresUnicos.size() >= 7;
+        return valoresUnicos.size() == 7;
     }
 
 }
