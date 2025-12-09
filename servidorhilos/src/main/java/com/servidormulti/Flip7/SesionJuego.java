@@ -69,29 +69,28 @@ public class SesionJuego {
         anunciarTurno();
     }
 
-    public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
-        if (!juegoIniciado)
-            return;
+   public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
+        if (!juegoIniciado) return;
 
-        // HABILITAR CHAT
-        // Si NO empieza con "/", es un mensaje de chat para todos.
+        // [NUEVO] - Habilitar Chat Global
+        // Si no empieza con "/", es chat y se envía a todos.
         if (!mensaje.trim().startsWith("/")) {
             broadcastMensaje("<" + remitente.getNombreUsuario() + ">: " + mensaje);
-            return; // Terminamos aquí, no procesamos como comando.
+            return; 
         }
+
         String[] partes = mensaje.trim().split("\\s+");
         String comando = partes[0].toLowerCase();
 
+       // Permitir ver puntuación siempre
         if (comando.equals("/puntuacion")) {
-            String reporte = obtenerReportePuntuacion();
-            enviarMensajePrivado(remitente, reporte);
+            enviarMensajePrivado(remitente, obtenerReportePuntuacion());
             return;
         }
 
         UnCliente clienteActual = clientesEnSala.get(indiceTurnoActual);
         if (!remitente.getClienteID().equals(clienteActual.getClienteID())) {
-            enviarMensajePrivado(remitente, "No es tu turno. Puedes chatear, pero espera a "
-                    + clienteActual.getNombreUsuario() + " para jugar.");
+            enviarMensajePrivado(remitente, "No es tu turno. Espera a " + clienteActual.getNombreUsuario());
             return;
         }
 
@@ -103,10 +102,9 @@ public class SesionJuego {
                     enviarMensajePrivado(remitente, "Debes especificar un nombre. Ej: /usar Juan");
                     return;
                 }
-                String nombreObjetivo = partes[1];
-                ejecutarAccionPendiente(remitente, nombreObjetivo);
+                ejecutarAccionPendiente(remitente, partes[1]);
             } else {
-                enviarMensajePrivado(remitente, "¡Tienes una carta de ACCIÓN pendiente! Usa: /usar [NombreDeLaLista]");
+                enviarMensajePrivado(remitente, "¡Tienes una carta de ACCIÓN pendiente! Usa: /usar [Nombre]");
             }
             return;
         }
@@ -118,13 +116,8 @@ public class SesionJuego {
             case "/parar":
                 accionParar(remitente, jugadorActual);
                 break;
-            case "/puntuacion":
-                String reporte = obtenerReportePuntuacion();
-                enviarMensajePrivado(remitente, reporte);
-                return;
             default:
-                enviarMensajePrivado(remitente,
-                        "Comando no válido. Usa /jalar, /parar, /puntiacion o escribe normal para chatear.");
+                enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar, /puntuacion o escribe normal para chatear.");
         }
     }
 
