@@ -75,11 +75,6 @@ public class SesionJuego {
 
         Jugador jugadorActual = jugadores.get(remitente.getClienteID());
 
-        /*
-         * String[] partes = mensaje.trim().split("\\s+");
-         * String comando = partes[0].toLowerCase();
-         */
-
         if (esperandoObjetivo) {
             if (comando.equals("/usar")) {
                 if (partes.length < 2) {
@@ -120,18 +115,18 @@ public class SesionJuego {
             carta = baraja.jalarCarta();
         }
 
+        if (carta == null) {
+            broadcastMensaje("Error: El mazo sigue vacío después de reiniciar. Finalizando ronda...");
+            finalizarRonda();
+            return;
+        }
+
         broadcastMensaje(cliente.getNombreUsuario() + " jaló: " + carta);
 
         // DETECCIÓN DE CARTAS DE ACCIÓN
         if (carta.obtenerTipo() == TipoCarta.ACCION) {
             procesarCartaAccion(cliente, jugador, carta);
             return; // Salimos para esperar input del usuario o resolver efecto
-        }
-
-        if (carta == null) {
-            broadcastMensaje("Error: El mazo sigue vacío después de reiniciar. Finalizando ronda...");
-            finalizarRonda();
-            return;
         }
 
         // Lógica Normal (Numéricas y Bonus)
@@ -147,8 +142,9 @@ public class SesionJuego {
                 finalizarRonda();
                 return;
             }
+
             enviarMensajePrivado(cliente, "Tu mano actual: " + jugador.obtenerCartasEnMano());
-            enviarMensajePrivado(cliente, "¿Quieres /jalar otra, /parar o /puntuacion?");
+            siguienteTurno(); 
         }
     }
 
@@ -254,8 +250,9 @@ public class SesionJuego {
         this.esperandoObjetivo = false;
         this.accionPendiente = null;
 
-        // El turno continúa para el jugador actual después de usar la acción
-        enviarMensajePrivado(atacante, "¿Quieres /jalar otra o /parar?");
+        // CORRECCIÓN CLAVE: El turno del atacante debe terminar después de usar la
+        // acción.
+        siguienteTurno();
     }
 
     private void accionParar(UnCliente cliente, Jugador jugador) {
