@@ -37,30 +37,27 @@ public class Jugador {
     }
 
     public boolean intentarJalarCarta(Carta nuevaCarta) {
-        if (tieneBUST || sePlanto) {
-            return false;
-        }
+        if (tieneBUST || sePlanto) return false;
 
-        // Si NO es numérica (Acción/Bonus), siempre se agrega y no causa BUST ---
+        // Si es Bonus/Accion se agrega directo...
         if (nuevaCarta.obtenerTipo() != TipoCarta.NUMERICA) {
             this.cartasEnMano.add(nuevaCarta);
             return true;
         }
 
-        // Lógica de BUST (Solo para numéricas)
+        // Lógica de BUST
         if (verificarSiCausaBUST(nuevaCarta)) {
             if (this.tieneSecondChance) {
-                this.tieneSecondChance = false; // Consume la vida extra
-                return true;
+                this.tieneSecondChance = false; // Se gasta la vida
+              
+                return true; 
             } else {
-                // BUST definitivo. Anular puntos y finalizar turno
-                this.cartasEnMano.clear();
+                this.cartasEnMano.clear(); // Se borra todo
                 this.tieneBUST = true;
                 this.sePlanto = true;
                 return false;
             }
         } else {
-            // Es numérica y no repetida
             this.cartasEnMano.add(nuevaCarta);
             return true;
         }

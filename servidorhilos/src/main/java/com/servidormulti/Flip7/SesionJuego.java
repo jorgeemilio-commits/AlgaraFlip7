@@ -2,6 +2,7 @@ package com.servidormulti.Flip7;
 
 import com.servidormulti.UnCliente;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,8 @@ public class SesionJuego {
     private int indiceTurnoActual = 0;
     private boolean esperandoObjetivo = false;
     private Carta accionPendiente = null;
+    // Lista para guardar las acciones (Freeze, Flip3) que salen DURANTE un Flip Three activo
+private List<Carta> accionesAcumuladasFlipThree = new ArrayList<>();
 
     private int flipThreeCartasRestantes = 0;
     private Jugador flipThreeObjetivo = null;
@@ -74,15 +77,13 @@ public class SesionJuego {
         anunciarTurno();
     }
 
-    public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
-        if (!juegoIniciado)
-            return;
+   public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
+        if (!juegoIniciado) return;
 
-        // [NUEVO] - Habilitar Chat Global
-        // Si no empieza con "/", es chat y se envía a todos.
+        // [Chat Global]
         if (!mensaje.trim().startsWith("/")) {
             broadcastMensaje("<" + remitente.getNombreUsuario() + ">: " + mensaje);
-            return;
+            return; 
         }
 
         String[] partes = mensaje.trim().split("\\s+");
@@ -95,10 +96,22 @@ public class SesionJuego {
         }
 
         UnCliente clienteActual = clientesEnSala.get(indiceTurnoActual);
-        if (!remitente.getClienteID().equals(clienteActual.getClienteID())) {
+        boolean esTurnoDelJugador = remitente.getClienteID().equals(clienteActual.getClienteID());
+        boolean esVictimaDeFlipThree = false;
+
+        // Si hay un Flip Three activo, la víctima tiene permiso temporal de usar comandos
+        if (this.flipThreeObjetivo != null) {
+            if (remitente.getNombreUsuario().equalsIgnoreCase(this.flipThreeObjetivo.obtenerNombreUsuario())) {
+                esVictimaDeFlipThree = true;
+            }
+        }
+
+        // Bloqueamos solo si NO es su turno Y TAMPOCO es la víctima activa
+        if (!esTurnoDelJugador && !esVictimaDeFlipThree) {
             enviarMensajePrivado(remitente, "No es tu turno. Espera a " + clienteActual.getNombreUsuario());
             return;
         }
+        
 
         Jugador jugadorActual = jugadores.get(remitente.getClienteID());
 
@@ -115,6 +128,12 @@ public class SesionJuego {
             return;
         }
 
+    
+        if (esVictimaDeFlipThree && !esTurnoDelJugador) {
+             enviarMensajePrivado(remitente, "Estás resolviendo acciones de Flip Three. Solo puedes usar el comando /usar.");
+             return;
+        }
+
         switch (comando) {
             case "/jalar":
                 accionJalar(remitente, jugadorActual);
@@ -123,8 +142,7 @@ public class SesionJuego {
                 accionParar(remitente, jugadorActual);
                 break;
             default:
-                enviarMensajePrivado(remitente,
-                        "Comando no válido. Usa /jalar, /parar, /puntuacion o escribe normal para chatear.");
+                enviarMensajePrivado(remitente, "Comando no válido. Usa /jalar, /parar, /puntuacion o escribe normal para chatear.");
         }
     }
 
@@ -301,8 +319,8 @@ public class SesionJuego {
      */
 
     //cambio de metodo ejecutarAccionPendiente para corregir flip three
-    private void ejecutarAccionPendiente(UnCliente atacante, String nombreObjetivo) {
-        // Lógica de búsqueda de clienteObj y objetivo (la dejamos como la tenías)
+   private void ejecutarAccionPendiente(UnCliente atacante, String nombreObjetivo) {
+        // 1. Lógica de búsqueda de cliente (Se mantiene igual)
         UnCliente clienteObj = null;
         for (UnCliente c : clientesEnSala) {
             if (c.getNombreUsuario().equalsIgnoreCase(nombreObjetivo)) {
@@ -318,129 +336,180 @@ public class SesionJuego {
         }
 
         Jugador objetivo = jugadores.get(clienteObj.getClienteID());
-
         String nombreAccion = accionPendiente.toString();
 
+        // 2. Si es el INICIO de un Flip Three (Se mantiene igual)
         if (nombreAccion.equals("Flip Three")) {
-            // INICIO: Si es la primera vez que se ejecuta el Flip Three, iniciamos el
-            // estado.
+            // Inicializamos el estado del Flip Three
             this.flipThreeCartasRestantes = 3;
             this.flipThreeObjetivo = objetivo;
             this.flipThreeAtacante = atacante;
+            
+            //  Asegurar que la lista de acumulados esté limpia al iniciar
+            this.accionesAcumuladasFlipThree.clear(); 
 
-            // Limpiamos el estado pendiente para evitar confusión.
+            // Limpiamos el estado pendiente
             this.esperandoObjetivo = false;
             this.accionPendiente = null;
 
-            // Pasamos el control al motor del Flip Three.
+            // Arrancamos el motor
             iniciarOReanudarFlipThree(atacante, objetivo);
             return;
 
         } else if (nombreAccion.equals("Second Chance") || nombreAccion.equals("Freeze")) {
 
-            // Ejecución de acciones simples
+            // 3. Ejecución de la acción (Se mantiene igual)
             if (nombreAccion.equals("Second Chance")) {
                 manejadorAcciones.transferirSecondChance(objetivo);
             } else if (nombreAccion.equals("Freeze")) {
                 manejadorAcciones.aplicarFreeze(objetivo);
             }
 
-            // -----------------------------------------------------------
-            // LÓGICA DE REANUDACIÓN DE FLIP THREE
-            // -----------------------------------------------------------
-            if (this.flipThreeCartasRestantes > 0 && this.flipThreeObjetivo != null) {
+            broadcastMensaje("ACCIÓN " + nombreAccion + " ejecutada sobre " + objetivo.obtenerNombreUsuario());
 
-                // Si la acción que se acaba de resolver fue jalada *durante* un Flip Three,
-                // reanudamos la secuencia llamando al motor.
-                UnCliente reanudandoAtacante = this.flipThreeAtacante;
-                Jugador reanudandoObjetivo = this.flipThreeObjetivo;
-
-                // Limpiamos la acción actual antes de reanudar
-                this.esperandoObjetivo = false;
-                this.accionPendiente = null;
-
-                // Reanudamos el ataque Flip Three desde el punto de interrupción
-                iniciarOReanudarFlipThree(reanudandoAtacante, reanudandoObjetivo);
-                return;
-            }
-            // Anunciar resultado
-            broadcastMensaje(
-                    "ACCIÓN " + nombreAccion + " ejecutada. " + objetivo.obtenerNombreUsuario() + " afectado.");
-
-            // Limpiar estado de acción
+            // Limpiar estado de la acción actual
             this.esperandoObjetivo = false;
             this.accionPendiente = null;
-
-            siguienteTurno();
+            
+            if (this.flipThreeObjetivo != null) {
+            
+                procesarSiguienteAccionAcumulada();
+            } else {
+               
+                siguienteTurno();
+            }
+           
         }
     }
 
     //nuevo metodo flip three corregido
     private void iniciarOReanudarFlipThree(UnCliente atacante, Jugador objetivo) {
-        // Si la acción se acaba de resolver (ej: Freeze), el atacante es el que tiene
-        // el turno.
-        String nombreAccion = (accionPendiente != null) ? accionPendiente.toString() : "Flip Three";
-
-        broadcastMensaje("ACCIÓN " + nombreAccion + " ejecutada.");
-
-        // Limpiar acción pendiente después de su uso (si la hubo)
+        // Limpiamos variables de control inmediatas
         this.esperandoObjetivo = false;
         this.accionPendiente = null;
 
-        // Bucle para procesar las cartas restantes (se detiene en 0, BUST, o ACCIÓN)
+        // Si es el inicio de un nuevo Flip Three, aseguramos que la lista esté limpia
+        if (this.flipThreeCartasRestantes == 3) {
+            this.accionesAcumuladasFlipThree.clear();
+        }
+
+        boolean rompioBucle = false;
+
+        // BUCLE PRINCIPAL DE ROBO
         while (this.flipThreeCartasRestantes > 0 && !objetivo.tieneBUST()) {
-
-            broadcastMensaje(objetivo.obtenerNombreUsuario() + " está en Flip Three. Cartas restantes: "
-                    + this.flipThreeCartasRestantes);
-
-            // 1. Jalar una carta
-            Carta cartaJalada = manejadorAcciones.jalarUnaCartaFlipThree(objetivo, baraja);
-
-            this.flipThreeCartasRestantes--; // Decrementamos el contador inmediatamente
-
-            if (objetivo.tieneBUST()) {
-                broadcastMensaje(objetivo.obtenerNombreUsuario() + " sufrió BUST durante Flip Three!");
-                this.flipThreeCartasRestantes = 0;
-                break;
-            }
-
-            if (cartaJalada == null) {
-                // Error de mazo o BUST no capturado. Se asume que el BUST se capturó arriba.
-                continue;
-            }
-
-            if (cartaJalada.obtenerTipo() == TipoCarta.ACCION) {
-                broadcastMensaje("Flip Three PAUSADO. " + atacante.getNombreUsuario() + " debe usar la acción "
-                        + cartaJalada.toString() + ".");
-
-                // Pausar el turno y pedir la decisión para la NUEVA acción
-                this.accionPendiente = cartaJalada;
-                this.esperandoObjetivo = true;
-
-                // Guardamos el estado para que ejecutarAccionPendiente sepa reanudar
-                this.flipThreeAtacante = atacante;
-                this.flipThreeObjetivo = objetivo;
-
-                // Toca al atacante usar la carta de acción recién jalada.
-                procesarCartaAccion(atacante, jugadores.get(atacante.getClienteID()), cartaJalada);
-
-                // Devolvemos el control al cliente (pausa)
+            
+            // Regla: Si cumple Flip 7, se detiene todo inmediatamente
+            if (calculadora.verificarFlip7(objetivo.obtenerCartasEnMano())) {
+                broadcastMensaje("¡FLIP 7 conseguido durante Flip Three! Se detiene la secuencia.");
+                finalizarRonda();
                 return;
             }
 
-            // Si es Numérica/Bonus, el Flip Three continúa
-            broadcastMensaje(objetivo.obtenerNombreUsuario() + " jaló " + cartaJalada.toString()
-                    + ". Cartas restantes: " + this.flipThreeCartasRestantes);
-        } // Fin del bucle WHILE
+            broadcastMensaje(objetivo.obtenerNombreUsuario() + " jalando carta de Flip Three... (" + this.flipThreeCartasRestantes + " restantes)");
+            
+            
+            Carta carta = baraja.jalarCarta();
+            if (carta == null) { baraja.reiniciarBaraja(); carta = baraja.jalarCarta(); }
+            if (carta == null) break; // Error extremo
 
-        // Si salimos del bucle, el ataque Flip Three ha terminado.
-        if (this.flipThreeCartasRestantes == 0) {
-            broadcastMensaje("Flip Three completado.");
-            // Limpiar variables de estado global después de terminar la secuencia
+            this.flipThreeCartasRestantes--;
+
+          
+            if (carta.obtenerTipo() == TipoCarta.ACCION) {
+                String nombre = carta.toString();
+                
+                if (nombre.equals("Second Chance")) {
+                    // Regla: Se la queda inmediatamente. Si ya tiene una, la guarda para darla después.
+                    if (!objetivo.tieneSecondChance()) {
+                        objetivo.setTieneSecondChance(true);
+                        broadcastMensaje(objetivo.obtenerNombreUsuario() + " obtuvo Second Chance (se la queda).");
+                    } else {
+                        // Si ya tiene, se agrega a la cola para regalarla al final
+                        broadcastMensaje("¡Segunda Second Chance! Se guarda para regalar al final.");
+                        accionesAcumuladasFlipThree.add(carta);
+                    }
+                } else {
+                    // Regla: Freeze y Flip Three se guardan hasta terminar las 3 cartas
+                    broadcastMensaje("Salió " + nombre + ". Se guarda para aplicar al finalizar las 3 cartas.");
+                    accionesAcumuladasFlipThree.add(carta);
+                }
+            } 
+           
+            else {
+                broadcastMensaje("Salió: " + carta.toString());
+                boolean sobrevivio = objetivo.intentarJalarCarta(carta); 
+
+                if (!sobrevivio) {
+                    broadcastMensaje("¡BUST! " + objetivo.obtenerNombreUsuario() + " perdió todo.");
+                    // Regla: Si rompes, ignoras las cartas de acción acumuladas
+                    accionesAcumuladasFlipThree.clear();
+                    rompioBucle = true;
+                    break;
+                }
+            }
+            
+            // Pequeña pausa visual para el chat (opcional)
+            try { Thread.sleep(1000); } catch (InterruptedException e) {}
+
+        } // Fin While
+
+      
+        
+        if (objetivo.tieneBUST()) {
+            // Si murió, turno siguiente.
+            this.flipThreeCartasRestantes = 0;
             this.flipThreeObjetivo = null;
             this.flipThreeAtacante = null;
-            siguienteTurno(); // Pasar el turno después de todo el proceso
+            siguienteTurno();
+        } else {
+            // Si sobrevivió (cartasRestantes == 0), checamos si hay acciones pendientes de "de ahuevo"
+            if (!accionesAcumuladasFlipThree.isEmpty()) {
+                broadcastMensaje("Flip Three finalizado sin BUST. Ahora debes aplicar las acciones acumuladas...");
+                procesarSiguienteAccionAcumulada(); 
+            } else {
+                broadcastMensaje("Flip Three finalizado limpio.");
+                this.flipThreeObjetivo = null;
+                this.flipThreeAtacante = null;
+                siguienteTurno();
+            }
         }
+    }
+    private void procesarSiguienteAccionAcumulada() {
+        if (accionesAcumuladasFlipThree.isEmpty()) {
+            // Ya no hay más acciones pendientes, terminamos el turno
+            this.flipThreeObjetivo = null;
+            this.flipThreeAtacante = null;
+            siguienteTurno();
+            return;
+        }
+
+        // Sacamos la primera carta de la lista
+        Carta cartaAccion = accionesAcumuladasFlipThree.remove(0);
+        this.accionPendiente = cartaAccion;
+        this.esperandoObjetivo = true;
+        // Usamos al "objetivo" original como el "atacante" de esta nueva acción
+        UnCliente ejecutor = null; 
+        for(UnCliente c : clientesEnSala) {
+            if(c.getClienteID().equals(flipThreeObjetivo.obtenerNombreUsuario())) { 
+                 // Buscar el objeto UnCliente correspondiente al Jugador flipThreeObjetivo
+                
+            }
+        }
+       
+        UnCliente duenoDeLasCartas = buscarClientePorNombre(flipThreeObjetivo.obtenerNombreUsuario());
+
+        if (duenoDeLasCartas != null) {
+            // Reutilizamos tu lógica de mostrar menú
+            procesarCartaAccion(duenoDeLasCartas, flipThreeObjetivo, cartaAccion);
+        }
+    }
+    
+   
+    private UnCliente buscarClientePorNombre(String nombre) {
+        for(UnCliente c : clientesEnSala) {
+            if(c.getNombreUsuario().equals(nombre)) return c;
+        }
+        return null;
     }
 
     private void accionParar(UnCliente cliente, Jugador jugador) {
@@ -515,13 +584,12 @@ public class SesionJuego {
 
         if (ganadorDelJuego != null) {
             // Fin definitivo del juego
-            broadcastMensaje("\n🏆 ¡JUEGO TERMINADO! 🏆");
+            broadcastMensaje("\n ¡JUEGO TERMINADO! ");
             broadcastMensaje("El ganador es: " + ganadorDelJuego.obtenerNombreUsuario().toUpperCase());
             broadcastMensaje("Puntuación Final: " + maxPuntuacionGlobal);
             broadcastMensaje("------------------------------------------");
             broadcastMensaje("Escriban /listo para iniciar una partida nueva.");
         } else {
-            // [NUEVO] Continuar siguiente ronda automáticamente
             broadcastMensaje("Nadie ha llegado a 200 puntos. La siguiente ronda comienza en 15 segundos...");
 
             new Thread(() -> {
