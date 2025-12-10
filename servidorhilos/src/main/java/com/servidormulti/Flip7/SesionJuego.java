@@ -671,6 +671,20 @@ private List<Carta> accionesAcumuladasFlipThree = new ArrayList<>();
     clientesEnSala.remove(indiceJugadorQueSeVa);
     jugadores.remove(cliente.getClienteID());
 
+    // Si solo queda un jugador, ese gana automáticamente
+    if (clientesEnSala.size() == 1) {
+            UnCliente ganador = clientesEnSala.get(0);
+            broadcastMensaje("\n==========================================");
+            broadcastMensaje(" ¡VICTORIA POR ABANDONO! ");
+            broadcastMensaje(" Todos los contrincantes se han ido.");
+            broadcastMensaje(" EL GANADOR ES: " + ganador.getNombreUsuario().toUpperCase());
+            broadcastMensaje("==========================================");
+            broadcastMensaje("Escribe /listo para iniciar una nueva partida.");
+            
+            juegoIniciado = false; // Detenemos el juego actual
+            return; // Salimos, no hace falta ajustar turnos
+        }
+
     //  Ajustar el índice del turno
     // Si el jugador que se fue estaba ANTES del actual, el índice debe bajar uno para seguir apuntando al mismo jugador que estaba jugando.
     if (indiceJugadorQueSeVa < indiceTurnoActual) {

@@ -248,6 +248,11 @@ public class ManejadorSalas {
             SesionJuego juego = partidasActivas.get(sala);
             if (juego != null) {
                juego.removerJugador(cliente);
+
+               // Si no quedan jugadores, eliminar la partida
+               if (grupoDB.obtenerSalasDisponibles().get(sala) == null) {
+                   partidasActivas.remove(sala);
+                   }
             }
 
         cliente.establecerSalaActual(null);

@@ -93,7 +93,7 @@ public class GrupoDB {
     }
 
     /**
-     * Saca un usuario de un grupo. 
+     * Saca un usuario de un grupo y BORRA LA SALA si queda vacía.
      */
     public String salirGrupo(String nombreGrupo, String nombreUsuario) {
         if (nombreGrupo.equalsIgnoreCase("Todos")) {
@@ -106,18 +106,40 @@ public class GrupoDB {
         }
 
         String sqlDeleteMiembro = "DELETE FROM grupos_miembros WHERE grupo_id = ? AND usuario_nombre = ?";
+        // Consulta para verificar cuántos quedan
+        String sqlCountMiembros = "SELECT COUNT(*) FROM grupos_miembros WHERE grupo_id = ?";
+        // Consulta para borrar la sala
+        String sqlDeleteGrupo = "DELETE FROM grupos WHERE id = ?";
+
         Connection conn = ConexionDB.conectar();
         if (conn == null) return "Error de conexión.";
 
-        try (PreparedStatement pstmtMiembro = conn.prepareStatement(sqlDeleteMiembro)) {
-            pstmtMiembro.setInt(1, grupoId);
-            pstmtMiembro.setString(2, nombreUsuario);
-            int filasAfectadas = pstmtMiembro.executeUpdate();
+        try {
+            // Eliminar al usuario del grupo
+            try (PreparedStatement pstmtMiembro = conn.prepareStatement(sqlDeleteMiembro)) {
+                pstmtMiembro.setInt(1, grupoId);
+                pstmtMiembro.setString(2, nombreUsuario);
+                int filasAfectadas = pstmtMiembro.executeUpdate();
 
-            if (filasAfectadas > 0) {
-                return "Has salido del grupo '" + nombreGrupo + "'.";
-            } else {
-                return "No eras miembro del grupo '" + nombreGrupo + "'.";
+                if (filasAfectadas > 0) {
+                    // Si salió con éxito, verificamos si la sala quedó vacía
+                    try (PreparedStatement pstmtCount = conn.prepareStatement(sqlCountMiembros)) {
+                        pstmtCount.setInt(1, grupoId);
+                        ResultSet rs = pstmtCount.executeQuery();
+                        
+                        if (rs.next() && rs.getInt(1) == 0) {
+                            // Si hay 0 miembros, borramos la sala de la tabla 'grupos'
+                            try (PreparedStatement pstmtDeleteGrupo = conn.prepareStatement(sqlDeleteGrupo)) {
+                                pstmtDeleteGrupo.setInt(1, grupoId);
+                                pstmtDeleteGrupo.executeUpdate();
+                                System.out.println("Sala '" + nombreGrupo + "' eliminada automáticamente por estar vacía.");
+                            }
+                        }
+                    }
+                    return "Has salido del grupo '" + nombreGrupo + "'.";
+                } else {
+                    return "No eras miembro del grupo '" + nombreGrupo + "'.";
+                }
             }
         } catch (SQLException e) {
             System.err.println("Error al salir de grupo: " + e.getMessage());
