@@ -13,6 +13,8 @@ public class ServidorMulti {
 
     public static void main(String[] args) throws IOException {
         
+        ConexionDB.inicializar();
+        
         ContextoServidor contexto = new ContextoServidor(clientes);
         System.out.println("Servicios del servidor inicializados.");
         

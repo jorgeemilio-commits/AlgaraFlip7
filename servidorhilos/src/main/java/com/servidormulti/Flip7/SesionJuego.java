@@ -611,6 +611,17 @@ private List<Carta> accionesAcumuladasFlipThree = new ArrayList<>();
     }
 
     private void anunciarTurno() {
+        // Verifica si hay jugadores en la sala
+        if (clientesEnSala.isEmpty()) {
+           return;
+        }
+
+         // Asegura que el índice sea válido
+         if (indiceTurnoActual >= clientesEnSala.size()) {
+           indiceTurnoActual = 0;
+        }
+
+        // Anuncia el turno al jugador actual
         UnCliente actual = clientesEnSala.get(indiceTurnoActual);
         broadcastMensaje("\n>>> Turno de: " + actual.getNombreUsuario() + " <<<");
         enviarMensajePrivado(actual, "Es tu turno. Escribe /jalar o /parar");
