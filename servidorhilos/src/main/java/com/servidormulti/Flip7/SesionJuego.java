@@ -173,7 +173,7 @@ private List<Carta> accionesAcumuladasFlipThree = new ArrayList<>();
         boolean sobrevivio = jugador.intentarJalarCarta(carta);
 
         if (sobrevivio && teniaVida && !jugador.tieneSecondChance()) {
-            broadcastMensaje("✨ ¡" + cliente.getNombreUsuario() + " usó su SECOND CHANCE para salvarse! La carta " + carta + " fue descartada. ✨");
+            broadcastMensaje(" ¡" + cliente.getNombreUsuario() + " usó su SECOND CHANCE para salvarse! La carta " + carta + " fue descartada. ");
         }
 
         if (!sobrevivio) {
