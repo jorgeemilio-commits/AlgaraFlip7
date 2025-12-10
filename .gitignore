@@ -1,1 +1,24 @@
 usuarios.db
+# --- Archivos Compilados ---
+target/
+# Ignorar archivos .class sueltos
+*.class
+
+# --- Archivos de IDE ---
+
+.idea/
+*.iml
+
+.vscode/
+
+.classpath
+.project
+.settings/
+
+# --- Archivos del Sistema Operativo ---
+.DS_Store
+Thumbs.db
+
+# --- Archivos de Datos y Logs ---
+*.log
+usuarios.db
