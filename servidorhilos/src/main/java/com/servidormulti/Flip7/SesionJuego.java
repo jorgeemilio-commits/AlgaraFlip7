@@ -648,4 +648,43 @@ private List<Carta> accionesAcumuladasFlipThree = new ArrayList<>();
         reporte.append("-------------------------\n");
         return reporte.toString();
     }
+    
+
+    public synchronized void removerJugador(UnCliente cliente) {
+    //  Si el juego no ha empezado, solo lo sacamos de la lista
+    if (!juegoIniciado) {
+        clientesEnSala.remove(cliente);
+        jugadores.remove(cliente.getClienteID());
+        broadcastMensaje(cliente.getNombreUsuario() + " ha abandonado la sala.");
+        return;
+    }
+
+    // Si el juego YA empezó, la lógica es diferente
+    broadcastMensaje("¡" + cliente.getNombreUsuario() + " abandonó la partida!");
+
+    int indiceJugadorQueSeVa = clientesEnSala.indexOf(cliente);
+    if (indiceJugadorQueSeVa == -1) return; // Ya no estaba
+
+    boolean eraSuTurno = (indiceJugadorQueSeVa == indiceTurnoActual);
+
+    // Eliminamos al jugador de las listas
+    clientesEnSala.remove(indiceJugadorQueSeVa);
+    jugadores.remove(cliente.getClienteID());
+
+    //  Ajustar el índice del turno
+    // Si el jugador que se fue estaba ANTES del actual, el índice debe bajar uno para seguir apuntando al mismo jugador que estaba jugando.
+    if (indiceJugadorQueSeVa < indiceTurnoActual) {
+        indiceTurnoActual--;
+    }
+    // Si el índice se sale de rango (era el último), lo ajustamos al inicio
+    if (indiceTurnoActual >= clientesEnSala.size()) {
+        indiceTurnoActual = 0;
+    }
+
+    // Si era su turno, pasamos al siguiente automáticamente
+    if (eraSuTurno) {
+        broadcastMensaje("El jugador actual se fue. Pasando turno...");
+        anunciarTurno(); 
+    }
+  }
 }

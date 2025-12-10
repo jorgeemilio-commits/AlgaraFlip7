@@ -244,7 +244,15 @@ public class ManejadorSalas {
                 votosListo.get(sala).remove(cliente.getNombreUsuario());
             }
 
-            cliente.establecerSalaActual(null);
+            // Si hay una partida activa, remover al jugador
+            SesionJuego juego = partidasActivas.get(sala);
+            if (juego != null) {
+               juego.removerJugador(cliente);
+            }
+
+        cliente.establecerSalaActual(null);
+        System.out.println("Jugador " + cliente.getNombreUsuario() + " removido de la sala/partida " + sala);
+
         }
     }
 
