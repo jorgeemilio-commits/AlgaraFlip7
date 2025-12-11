@@ -234,7 +234,7 @@ public class ManejadorSalas {
     }
 
     // Lógica para unirse a una sala
-    private boolean unirseASala(String nombreSala, UnCliente cliente, DataOutputStream salida) throws IOException {
+    public boolean unirseASala(String nombreSala, UnCliente cliente, DataOutputStream salida) throws IOException {
         String resultado = grupoDB.unirseGrupo(nombreSala, cliente.getNombreUsuario());
         
         if (resultado.contains("Error") || resultado.contains("no existe")) {

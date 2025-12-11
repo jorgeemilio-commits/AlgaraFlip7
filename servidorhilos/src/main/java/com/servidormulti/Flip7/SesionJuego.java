@@ -50,17 +50,106 @@ public class SesionJuego {
     public void iniciarPartida() {
         if (juegoIniciado) return;
 
+        // Limpieza inicial
         jugadores.clear();
         for (UnCliente c : clientesEnSala) {
             jugadores.put(c.getClienteID(), new Jugador(c.getNombreUsuario()));
         }
 
-        baraja.reiniciarBaraja();
+        // --- LÓGICA DE CARGA O REINICIO ---
+        String nombreSala = clientesEnSala.get(0).obtenerSalaActual();
+        // Consultamos al contexto/DB si hay una partida guardada para esta sala
+        // (Accedemos a GrupoDB a través de una referencia estática o pasando el objeto, 
+        //  aquí asumiremos que instanciamos GrupoDB localmente o lo pasamos en constructor. 
+        //  Para simplificar y mantener tu estructura, lo instanciamos aquí rápido o usamos Contexto).
+        
+        com.servidormulti.GrupoDB db = new com.servidormulti.GrupoDB(); // Instancia temporal
+        Integer idGuardado = db.obtenerIdPartidaPorSala(nombreSala);
+
+        if (idGuardado != null) {
+            vista.mostrarMensajeGenerico(clientesEnSala, "¡PARTIDA GUARDADA ENCONTRADA! Cargando estado...");
+            boolean cargaExitosa = cargarEstadoDeBaseDeDatos(idGuardado, db);
+            if (cargaExitosa) {
+                // Borramos el guardado para que no se cargue infinitamente si reinician de nuevo
+                db.eliminarPartidaGuardada(idGuardado);
+            } else {
+                vista.mostrarMensajeGenerico(clientesEnSala, "Error cargando. Iniciando partida nueva.");
+                baraja.reiniciarBaraja();
+            }
+        } else {
+            // Partida Normal
+            baraja.reiniciarBaraja();
+        }
+        // ----------------------------------
+
         juegoIniciado = true;
         esperandoObjetivo = false;
         
         vista.mostrarInicioPartida(clientesEnSala);
-        configurarYArrancarRonda();
+        
+        // Si cargamos partida, anunciamos el turno guardado, si no, random
+        if (idGuardado == null) {
+            if (!clientesEnSala.isEmpty()) {
+                indiceTurnoActual = new java.util.Random().nextInt(clientesEnSala.size());
+            }
+        }
+        anunciarTurno();
+    }
+
+    // Carga el estado de la partida desde la base de datos
+    private boolean cargarEstadoDeBaseDeDatos(int id, com.servidormulti.GrupoDB db) {
+        try {
+            this.indiceTurnoActual = db.obtenerTurnoGuardado(id);
+            List<com.servidormulti.GrupoDB.DatosJugadorGuardado> datos = db.cargarJugadoresDePartida(id);
+
+            baraja.reiniciarBaraja(); 
+
+            for (com.servidormulti.GrupoDB.DatosJugadorGuardado d : datos) {
+                // Buscar al jugador conectado que coincida con el nombre
+                UnCliente clienteDueño = null;
+                for(UnCliente c : clientesEnSala) {
+                    if(c.getNombreUsuario().equals(d.nombre)) {
+                        clienteDueño = c;
+                        break;
+                    }
+                }
+                
+                if (clienteDueño != null) {
+                    Jugador j = jugadores.get(clienteDueño.getClienteID());
+                    j.sumarPuntos(d.puntuacion); // Restaurar puntos base
+                    j.setTieneSecondChance(d.secondChance);
+                    
+                    // Restaurar cartas en mano
+                    if (d.cartas != null && !d.cartas.isEmpty()) {
+                        String[] cartasArr = d.cartas.split(",");
+                        for (String nombreCarta : cartasArr) {
+                            Carta c = reconstruirCarta(nombreCarta);
+                            if (c != null) j.obtenerCartasEnMano().add(c);
+                        }
+                    }
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Construye una carta a partir de su nombre 
+    private Carta reconstruirCarta(String nombre) {
+        try {
+            if (nombre.equals("Second Chance")) return new Carta(0, "Second Chance", TipoCarta.ACCION);
+            if (nombre.equals("Freeze")) return new Carta(0, "Freeze", TipoCarta.ACCION);
+            if (nombre.equals("Flip Three")) return new Carta(0, "Flip Three", TipoCarta.ACCION);
+            if (nombre.equals("x2")) return new Carta(0, "x2", TipoCarta.BONUS);
+            if (nombre.equals("+10")) return new Carta(0, "+10", TipoCarta.BONUS);
+            
+            int valor = Integer.parseInt(nombre);
+            return new Carta(valor, String.valueOf(valor), TipoCarta.NUMERICA);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void iniciarSiguienteRonda() {

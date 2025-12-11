@@ -9,10 +9,14 @@ public class ManejadorMenu {
 
     private final ManejadorAutenticacion manejadorAutenticacion;
     private final ManejadorSalas manejadorSalas;
+    // Necesitamos referencia a GrupoDB para las partidas guardadas
+    private final GrupoDB grupoDB; 
 
-    public ManejadorMenu(ManejadorAutenticacion auth, ManejadorSalas salas) {
+    // IMPORTANTE: Recuerda actualizar ContextoServidor.java para pasar grupoDB aquí
+    public ManejadorMenu(ManejadorAutenticacion auth, ManejadorSalas salas, GrupoDB gdb) {
         this.manejadorAutenticacion = auth;
         this.manejadorSalas = salas;
+        this.grupoDB = gdb;
     }
 
     // --- Lógica de Estado ---
@@ -21,10 +25,12 @@ public class ManejadorMenu {
                estado == EstadoMenu.MENU_UNIRSE_SALA ||
                estado == EstadoMenu.MENU_CREAR_SALA_NOMBRE ||
                estado == EstadoMenu.SALA_ACTIVA;
+               // NOTA: MENU_VER_PARTIDAS_GUARDADAS se maneja aquí en ManejadorMenu
     }
 
     // --- VISTAS ---
 
+    // Muestra el menú principal inicial
     public void mostrarMenuPrincipal(UnCliente cliente, DataOutputStream salida) throws IOException {
         String menu = "\n" +
                       "--- Bienvenido al Servidor de Chat ---\n" +
@@ -37,40 +43,29 @@ public class ManejadorMenu {
         cliente.establecerEstadoActual(EstadoMenu.MENU_PRINCIPAL);
     }
 
+    // Muestra el menú principal de salas
     public void mostrarMenuSalaPrincipal(UnCliente cliente, DataOutputStream salida) throws IOException {
         String estado = cliente.estaLogueado() ? "Logueado" : "Invitado (Solo chat)";
         String mensajeInvitado = cliente.estaLogueado() ? "" : " (No puedes crear salas)";
         
+        // Si está logueado, mostramos la opción de ver partidas guardadas
+        String opcion4 = cliente.estaLogueado() ? "\n  4. Ver Partidas Guardadas" : "";
+        String opcionesNum = cliente.estaLogueado() ? "1, 2, 3 o 4" : "1, 2 o 3";
+
         String menu = "\n" +
                       "--- MENU PRINCIPAL DE SALAS - " + estado + " como: " + cliente.getNombreUsuario() + mensajeInvitado + " ---\n" +
                       "Selecciona una opción:\n" +
                       "  1. Unirse a una Sala \n" +
                       "  2. Crear una Sala\n" +
-                      "  3. Cerrar Sesión\n" +
-                      "  4. Ver mis Partidas Guardadas\n" + 
+                      "  3. Cerrar Sesión" + 
+                      opcion4 + "\n" +
                       "----------------------------------------------------\n" +
-                      "Ingresa el número de tu opción (1-4):";
+                      "Ingresa el número de tu opción (" + opcionesNum + "):";
         salida.writeUTF(menu);
         cliente.establecerEstadoActual(EstadoMenu.MENU_SALA_PRINCIPAL);
     }
 
-    //
-    public void mostrarPartidasGuardadas(UnCliente cliente, DataOutputStream salida, Map<Integer, String> partidas) throws IOException {
-        StringBuilder sb = new StringBuilder("\n--- TUS PARTIDAS GUARDADAS ---\n");
-        if (partidas.isEmpty()) {
-            sb.append("No tienes partidas guardadas.\n");
-        } else {
-            for (Map.Entry<Integer, String> entry : partidas.entrySet()) {
-                sb.append("ID: ").append(entry.getKey())
-                  .append(" - Sala: ").append(entry.getValue())
-                  .append("\n");
-            }
-            sb.append("Escribe el ID de la partida para restaurar la sala y unirte, o /volver.\n");
-        }
-        salida.writeUTF(sb.toString());
-        cliente.establecerEstadoActual(EstadoMenu.MENU_VER_PARTIDAS_GUARDADAS);
-    }
-
+    // Muestra la lista de salas disponibles para unirse
     public void mostrarSalasDisponibles(UnCliente cliente, DataOutputStream salida, Map<String, Integer> salas) throws IOException {
         StringBuilder lista = new StringBuilder("\n--- SALAS DISPONIBLES (Máx 6) ---\n");
         
@@ -92,12 +87,13 @@ public class ManejadorMenu {
             }
         }
         lista.append("------------------------------------------\n");
-        lista.append("Escribe el NUMERO de la sala para unirte (o /salir para volver):");
+        lista.append("Escribe el NÚMERO de la sala para unirte (o /salir para volver):");
         
         salida.writeUTF(lista.toString());
         cliente.establecerEstadoActual(EstadoMenu.MENU_UNIRSE_SALA);
     }
 
+    // Muestra la interfaz de una sala activa
     public void mostrarInterfazSalaActiva(UnCliente cliente, DataOutputStream salida, String nombreSala) throws IOException {
         String limite = "Sin límite de mensajes."; 
         
@@ -115,6 +111,7 @@ public class ManejadorMenu {
         cliente.establecerEstadoActual(EstadoMenu.SALA_ACTIVA);
     }
 
+    // Muestra la lista de jugadores en la sala actual
     public void mostrarJugadoresEnSala(UnCliente cliente, DataOutputStream salida, List<String> nombresMiembros, String nombreSala) throws IOException {
         StringBuilder mensaje = new StringBuilder("\n--- JUGADORES EN LA SALA: " + nombreSala + " ---\n");
         
@@ -138,7 +135,7 @@ public class ManejadorMenu {
         salida.writeUTF(mensaje.toString());
     }
 
-    // --- PROCESAMIENTO (Menú Principal / Auth) ---
+    // --- PROCESAMIENTO (Menú Principal / Auth / Partidas Guardadas) ---
     public void procesar(String respuesta, UnCliente cliente, DataOutputStream salida) throws IOException {
         
         switch (cliente.obtenerEstadoActual()) {
@@ -168,7 +165,7 @@ public class ManejadorMenu {
                 cliente.limpiarTemporales(); 
                 
                 if (exitoLogin) {
-                    mostrarMenuSalaPrincipal(cliente, salida); // Ahora llamamos al método local
+                    mostrarMenuSalaPrincipal(cliente, salida);
                 } else {
                     mostrarMenuPrincipal(cliente, salida);
                 }
@@ -185,34 +182,35 @@ public class ManejadorMenu {
             case REGISTRO_PEDIR_CONFIRMACION:
                 boolean exitoRegistro = manejadorAutenticacion.manejarRegistroPorMenu_Paso3(respuesta, salida, cliente);
                 if (exitoRegistro) {
-                    mostrarMenuSalaPrincipal(cliente, salida); // Ahora llamamos al método local
+                    mostrarMenuSalaPrincipal(cliente, salida);
                 } else {
                     mostrarMenuPrincipal(cliente, salida); 
                 }
                 break;
 
+            // Lógica para ver y unirse a partidas guardadas
             case MENU_VER_PARTIDAS_GUARDADAS:
-                if (mensaje.equalsIgnoreCase("/volver")) {
-                    menu.mostrarMenuSalaPrincipal(cliente, salida);
+                if (respuesta.equalsIgnoreCase("/volver")) {
+                    mostrarMenuSalaPrincipal(cliente, salida);
                     return;
                 }
                 try {
-                    int idPartida = Integer.parseInt(mensaje);
+                    int idPartida = Integer.parseInt(respuesta);
                     Map<Integer, String> misPartidas = grupoDB.obtenerPartidasGuardadas(cliente.getNombreUsuario());
-                    
+
                     if (misPartidas.containsKey(idPartida)) {
                         String nombreSala = misPartidas.get(idPartida);
-                        
-                        // 1. Asegurar que la sala exista en la BD (si se borró al salir todos)
+
+                        // 1. Asegurar que la sala exista en la BD
                         grupoDB.asegurarSalaExiste(nombreSala);
-                        
-                        // 2. Unirse a la sala normalmente
-                        if (unirseASala(nombreSala, cliente, salida)) {
+
+                        // 2. Unirse a la sala 
+                        if (manejadorSalas.unirseASala(nombreSala, cliente, salida)) {
                             salida.writeUTF("Has vuelto a la sala de la partida guardada.");
                             salida.writeUTF("Esperando a los demás jugadores originales...");
                             salida.writeUTF("Cuando estéis todos, escribid /listo para RENAUDAR desde donde se quedó.");
                             
-                            menu.mostrarInterfazSalaActiva(cliente, salida, nombreSala);
+                            mostrarInterfazSalaActiva(cliente, salida, nombreSala);
                         }
                     } else {
                         salida.writeUTF("ID incorrecto o no te pertenece.");
@@ -220,7 +218,7 @@ public class ManejadorMenu {
                 } catch (NumberFormatException e) {
                     salida.writeUTF("Introduce un ID numérico válido.");
                 }
-                break;    
+                break;
                 
             default: 
                 salida.writeUTF("Error de estado interno. Volviendo al menú principal.");

@@ -26,9 +26,8 @@ public class ContextoServidor {
         );
         
         this.manejadorSalas = new ManejadorSalas(this.grupoDB, this.manejadorMensajes);
-        
-        // Inicializamos el ManejadorMenu inyectando las dependencias necesarias
-        this.manejadorMenu = new ManejadorMenu(this.manejadorAutenticacion, this.manejadorSalas);
+
+        this.manejadorMenu = new ManejadorMenu(this.manejadorAutenticacion, this.manejadorSalas, this.grupoDB);
     }
 
     public ManejadorMensajes getManejadorMensajes() { return manejadorMensajes; }
