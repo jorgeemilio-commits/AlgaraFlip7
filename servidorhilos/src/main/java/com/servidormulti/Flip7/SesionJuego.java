@@ -122,7 +122,7 @@ public class SesionJuego {
                 }
                 ejecutarAccionPendiente(remitente, partes[1]);
             } else {
-                enviarMensajePrivado(remitente, "¡Tienes una carta de ACCIÓN pendiente! Usa: /usar [Nombre]");
+                enviarMensajePrivado(remitente, "¡Tienes una carta de ACCION pendiente! Usa: /usar [Nombre]");
             }
             return;
         }
@@ -233,7 +233,7 @@ public class SesionJuego {
 
         else if (nombreCarta.equals("Freeze") || nombreCarta.equals("Flip Three")) {
             requiereObjetivo = true;
-            listaObjetivos.append("--- VÍCTIMAS DISPONIBLES ---\n");
+            listaObjetivos.append("--- VICTIMAS DISPONIBLES ---\n");
             for (UnCliente c : clientesEnSala) {
                 Jugador j = jugadores.get(c.getClienteID());
                 // Incluye al jugador actual si no ha terminado
@@ -327,7 +327,7 @@ public class SesionJuego {
             else if (nombreAccion.equals("Freeze"))
                 manejadorAcciones.aplicarFreeze(objetivo);
 
-            broadcastMensaje("ACCIÓN " + nombreAccion + " ejecutada sobre " + objetivo.obtenerNombreUsuario());
+            broadcastMensaje("ACCION " + nombreAccion + " ejecutada sobre " + objetivo.obtenerNombreUsuario());
 
             this.esperandoObjetivo = false;
             this.accionPendiente = null;
