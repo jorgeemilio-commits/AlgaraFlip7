@@ -84,6 +84,9 @@ public class ConexionDB {
                      "puntuacion INTEGER," +
                      "tiene_second_chance INTEGER," + // 1 si tiene, 0 si no
                      "cartas_mano TEXT," + 
+                     "es_bust INTEGER," +
+                     "se_planto INTEGER," +
+                     "esta_congelado INTEGER," +
                      "FOREIGN KEY(partida_id) REFERENCES partidas_guardadas(id)" +
                      ");";
 

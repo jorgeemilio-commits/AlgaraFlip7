@@ -34,13 +34,12 @@ public class GuardadoPartida {
             // Asumimos que todos están en la misma sala, tomamos el nombre del primero
             String nombreSala = clientes.get(0).obtenerSalaActual();
 
-            // CAMBIO: Quitamos Statement.RETURN_GENERATED_KEYS para evitar el error del driver
             try (PreparedStatement pstmt = conn.prepareStatement(sqlPartida)) {
                 pstmt.setString(1, nombreSala);
                 pstmt.setInt(2, turnoActual);
                 pstmt.executeUpdate();
 
-                // CAMBIO: Recuperamos el ID usando la función nativa de SQLite
+                // Recuperamos el ID generado
                 try (Statement stmt = conn.createStatement();
                      ResultSet rs = stmt.executeQuery("SELECT last_insert_rowid()")) {
                     if (rs.next()) {
@@ -50,13 +49,14 @@ public class GuardadoPartida {
             }
 
             // 2. Guardar a cada jugador
-            String sqlJugador = "INSERT INTO jugadores_guardados (partida_id, nombre_usuario, puntuacion, tiene_second_chance, cartas_mano) VALUES (?, ?, ?, ?, ?)";
+            String sqlJugador = "INSERT INTO jugadores_guardados " +
+                "(partida_id, nombre_usuario, puntuacion, tiene_second_chance, cartas_mano, es_bust, se_planto, esta_congelado) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             
             try (PreparedStatement pstmt = conn.prepareStatement(sqlJugador)) {
                 for (UnCliente c : clientes) {
                     Jugador j = jugadores.get(c.getClienteID());
                     
-                    // Convertir cartas a texto (Ej: "5,x2,Freeze")
                     String cartasString = j.obtenerCartasEnMano().stream()
                                            .map(Carta::toString)
                                            .collect(Collectors.joining(","));
@@ -66,6 +66,10 @@ public class GuardadoPartida {
                     pstmt.setInt(3, j.obtenerPuntuacionTotal());
                     pstmt.setInt(4, j.tieneSecondChance() ? 1 : 0);
                     pstmt.setString(5, cartasString);
+                    pstmt.setInt(6, j.tieneBUST() ? 1 : 0);
+                    pstmt.setInt(7, j.sePlanto() ? 1 : 0);
+                    pstmt.setInt(8, j.estaCongelado() ? 1 : 0);
+                    
                     pstmt.addBatch();
                 }
                 pstmt.executeBatch();

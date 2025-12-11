@@ -276,11 +276,17 @@ public class GrupoDB {
         public int puntuacion;
         public boolean secondChance;
         public String cartas;
+        public boolean esBust;
+        public boolean sePlanto;
+        public boolean estaCongelado;
     }
 
     public List<DatosJugadorGuardado> cargarJugadoresDePartida(int partidaId) {
         List<DatosJugadorGuardado> lista = new ArrayList<>();
-        String sql = "SELECT nombre_usuario, puntuacion, tiene_second_chance, cartas_mano FROM jugadores_guardados WHERE partida_id = ?";
+        // SQL ACTUALIZADO
+        String sql = "SELECT nombre_usuario, puntuacion, tiene_second_chance, cartas_mano, es_bust, se_planto, esta_congelado " +
+                     "FROM jugadores_guardados WHERE partida_id = ?";
+        
         Connection conn = ConexionDB.conectar();
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, partidaId);
@@ -291,13 +297,16 @@ public class GrupoDB {
                 d.puntuacion = rs.getInt("puntuacion");
                 d.secondChance = rs.getInt("tiene_second_chance") == 1;
                 d.cartas = rs.getString("cartas_mano");
+                d.esBust = rs.getInt("es_bust") == 1;
+                d.sePlanto = rs.getInt("se_planto") == 1;
+                d.estaCongelado = rs.getInt("esta_congelado") == 1;
+                
                 lista.add(d);
             }
         } catch (SQLException e) { e.printStackTrace(); }
         finally { ConexionDB.cerrarConexion(conn); }
         return lista;
     }
-    
     // Método para borrar la partida guardada una vez que se reanuda con éxito (opcional, para limpieza)
     public void eliminarPartidaGuardada(int partidaId) {
         String sql = "DELETE FROM partidas_guardadas WHERE id = ?";

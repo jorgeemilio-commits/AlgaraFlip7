@@ -119,4 +119,16 @@ public class Jugador {
     public boolean estaCongelado() {
         return estaCongelado;
     }
+
+    public void setTieneBUST(boolean tieneBUST) {
+        this.tieneBUST = tieneBUST;
+    }
+
+    public void setSePlanto(boolean sePlanto) {
+        this.sePlanto = sePlanto;
+    }
+
+    public void setEstaCongelado(boolean estaCongelado) {
+        this.estaCongelado = estaCongelado;
+    }
 }
