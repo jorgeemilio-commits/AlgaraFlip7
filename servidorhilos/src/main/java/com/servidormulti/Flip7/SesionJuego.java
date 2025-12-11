@@ -28,6 +28,9 @@ public class SesionJuego {
     private Jugador flipThreeObjetivo = null;
     private UnCliente flipThreeAtacante = null; // Mantenemos referencia aunque no se use mucho
 
+    private static final long TIEMPO_ENTRE_CARTAS_FLIP3 = 1000; // 1 segundo entre cartas
+    private static final long TIEMPO_ESPERA_NUEVA_RONDA = 15000; // 15 segundos antes de nueva ronda
+
     public SesionJuego(List<UnCliente> clientes) {
         this.clientesEnSala = clientes;
         this.jugadores = new HashMap<>();
@@ -312,7 +315,7 @@ public class SesionJuego {
                 }
             }
 
-            try { Thread.sleep(1000); } catch (InterruptedException e) {}
+            try { Thread.sleep(TIEMPO_ENTRE_CARTAS_FLIP3); } catch (InterruptedException e) {}
         }
 
         if (objetivo.tieneBUST()) {
@@ -413,7 +416,7 @@ public class SesionJuego {
             vista.mostrarEsperaNuevaRonda(clientesEnSala);
             new Thread(() -> {
                 try {
-                    Thread.sleep(15000);
+                    Thread.sleep(TIEMPO_ESPERA_NUEVA_RONDA);
                     vista.mostrarMensajeGenerico(clientesEnSala, "¡Tiempo fuera! Preparando cartas...");
                     iniciarSiguienteRonda();
                 } catch (InterruptedException e) { e.printStackTrace(); }
