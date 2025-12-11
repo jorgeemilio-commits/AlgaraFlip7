@@ -208,4 +208,110 @@ public class GrupoDB {
     public List<String> obtenerNombresDeGrupos() {
         return new ArrayList<>(obtenerSalasDisponibles().keySet());
     }
+
+    
+    // --- MÉTODOS PARA CARGAR PARTIDAS ---
+
+    public Map<Integer, String> obtenerPartidasGuardadas(String nombreUsuario) {
+        Map<Integer, String> partidas = new HashMap<>();
+        // Buscamos partidas donde el usuario esté registrado en la tabla de guardado
+        String sql = "SELECT p.id, p.sala FROM partidas_guardadas p " +
+                     "JOIN jugadores_guardados j ON p.id = j.partida_id " +
+                     "WHERE j.nombre_usuario = ?";
+        
+        Connection conn = ConexionDB.conectar();
+        if (conn == null) return partidas;
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, nombreUsuario);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                partidas.put(rs.getInt("id"), rs.getString("sala"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al obtener partidas guardadas: " + e.getMessage());
+        } finally {
+            ConexionDB.cerrarConexion(conn);
+        }
+        return partidas;
+    }
+
+    // Restaura la sala en la tabla 'grupos' si fue eliminada al vaciarse
+    public void asegurarSalaExiste(String nombreSala) {
+        if (getGrupoId(nombreSala) == null) {
+            crearGrupo(nombreSala); // Reutilizamos el método de crear
+        }
+    }
+
+    // Obtiene el ID de partida guardada asociado a una sala (para saber si cargar o iniciar nueva)
+    public Integer obtenerIdPartidaPorSala(String nombreSala) {
+        String sql = "SELECT id FROM partidas_guardadas WHERE sala = ? ORDER BY id DESC LIMIT 1";
+        Connection conn = ConexionDB.conectar();
+        if (conn == null) return null;
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, nombreSala);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt("id");
+        } catch (SQLException e) { e.printStackTrace(); }
+        finally { ConexionDB.cerrarConexion(conn); }
+        return null;
+    }
+
+    // Obtiene el turno guardado
+    public int obtenerTurnoGuardado(int partidaId) {
+        String sql = "SELECT turno_actual FROM partidas_guardadas WHERE id = ?";
+        Connection conn = ConexionDB.conectar();
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, partidaId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt("turno_actual");
+        } catch (SQLException e) { e.printStackTrace(); }
+        finally { ConexionDB.cerrarConexion(conn); }
+        return 0;
+    }
+
+    // Estructura auxiliar para devolver datos del jugador
+    public static class DatosJugadorGuardado {
+        public String nombre;
+        public int puntuacion;
+        public boolean secondChance;
+        public String cartas;
+    }
+
+    public List<DatosJugadorGuardado> cargarJugadoresDePartida(int partidaId) {
+        List<DatosJugadorGuardado> lista = new ArrayList<>();
+        String sql = "SELECT nombre_usuario, puntuacion, tiene_second_chance, cartas_mano FROM jugadores_guardados WHERE partida_id = ?";
+        Connection conn = ConexionDB.conectar();
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, partidaId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                DatosJugadorGuardado d = new DatosJugadorGuardado();
+                d.nombre = rs.getString("nombre_usuario");
+                d.puntuacion = rs.getInt("puntuacion");
+                d.secondChance = rs.getInt("tiene_second_chance") == 1;
+                d.cartas = rs.getString("cartas_mano");
+                lista.add(d);
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        finally { ConexionDB.cerrarConexion(conn); }
+        return lista;
+    }
+    
+    // Método para borrar la partida guardada una vez que se reanuda con éxito (opcional, para limpieza)
+    public void eliminarPartidaGuardada(int partidaId) {
+        String sql = "DELETE FROM partidas_guardadas WHERE id = ?";
+        String sqlJ = "DELETE FROM jugadores_guardados WHERE partida_id = ?";
+        Connection conn = ConexionDB.conectar();
+        try {
+            PreparedStatement p1 = conn.prepareStatement(sqlJ);
+            p1.setInt(1, partidaId);
+            p1.executeUpdate();
+            
+            PreparedStatement p2 = conn.prepareStatement(sql);
+            p2.setInt(1, partidaId);
+            p2.executeUpdate();
+        } catch(SQLException e) { e.printStackTrace(); }
+        finally { ConexionDB.cerrarConexion(conn); }
+    }
 }

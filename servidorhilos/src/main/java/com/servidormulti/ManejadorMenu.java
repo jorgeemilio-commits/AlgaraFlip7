@@ -47,10 +47,28 @@ public class ManejadorMenu {
                       "  1. Unirse a una Sala \n" +
                       "  2. Crear una Sala\n" +
                       "  3. Cerrar Sesión\n" +
+                      "  4. Ver mis Partidas Guardadas\n" + 
                       "----------------------------------------------------\n" +
-                      "Ingresa el número de tu opción (1, 2 o 3):";
+                      "Ingresa el número de tu opción (1-4):";
         salida.writeUTF(menu);
         cliente.establecerEstadoActual(EstadoMenu.MENU_SALA_PRINCIPAL);
+    }
+
+    //
+    public void mostrarPartidasGuardadas(UnCliente cliente, DataOutputStream salida, Map<Integer, String> partidas) throws IOException {
+        StringBuilder sb = new StringBuilder("\n--- TUS PARTIDAS GUARDADAS ---\n");
+        if (partidas.isEmpty()) {
+            sb.append("No tienes partidas guardadas.\n");
+        } else {
+            for (Map.Entry<Integer, String> entry : partidas.entrySet()) {
+                sb.append("ID: ").append(entry.getKey())
+                  .append(" - Sala: ").append(entry.getValue())
+                  .append("\n");
+            }
+            sb.append("Escribe el ID de la partida para restaurar la sala y unirte, o /volver.\n");
+        }
+        salida.writeUTF(sb.toString());
+        cliente.establecerEstadoActual(EstadoMenu.MENU_VER_PARTIDAS_GUARDADAS);
     }
 
     public void mostrarSalasDisponibles(UnCliente cliente, DataOutputStream salida, Map<String, Integer> salas) throws IOException {
@@ -74,7 +92,7 @@ public class ManejadorMenu {
             }
         }
         lista.append("------------------------------------------\n");
-        lista.append("Escribe el NÚMERO de la sala para unirte (o /salir para volver):");
+        lista.append("Escribe el NUMERO de la sala para unirte (o /salir para volver):");
         
         salida.writeUTF(lista.toString());
         cliente.establecerEstadoActual(EstadoMenu.MENU_UNIRSE_SALA);
@@ -172,6 +190,37 @@ public class ManejadorMenu {
                     mostrarMenuPrincipal(cliente, salida); 
                 }
                 break;
+
+            case MENU_VER_PARTIDAS_GUARDADAS:
+                if (mensaje.equalsIgnoreCase("/volver")) {
+                    menu.mostrarMenuSalaPrincipal(cliente, salida);
+                    return;
+                }
+                try {
+                    int idPartida = Integer.parseInt(mensaje);
+                    Map<Integer, String> misPartidas = grupoDB.obtenerPartidasGuardadas(cliente.getNombreUsuario());
+                    
+                    if (misPartidas.containsKey(idPartida)) {
+                        String nombreSala = misPartidas.get(idPartida);
+                        
+                        // 1. Asegurar que la sala exista en la BD (si se borró al salir todos)
+                        grupoDB.asegurarSalaExiste(nombreSala);
+                        
+                        // 2. Unirse a la sala normalmente
+                        if (unirseASala(nombreSala, cliente, salida)) {
+                            salida.writeUTF("Has vuelto a la sala de la partida guardada.");
+                            salida.writeUTF("Esperando a los demás jugadores originales...");
+                            salida.writeUTF("Cuando estéis todos, escribid /listo para RENAUDAR desde donde se quedó.");
+                            
+                            menu.mostrarInterfazSalaActiva(cliente, salida, nombreSala);
+                        }
+                    } else {
+                        salida.writeUTF("ID incorrecto o no te pertenece.");
+                    }
+                } catch (NumberFormatException e) {
+                    salida.writeUTF("Introduce un ID numérico válido.");
+                }
+                break;    
                 
             default: 
                 salida.writeUTF("Error de estado interno. Volviendo al menú principal.");

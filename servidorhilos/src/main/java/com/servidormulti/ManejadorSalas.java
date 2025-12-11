@@ -269,4 +269,8 @@ public class ManejadorSalas {
             return false;
         }
     }
+
+    public Map<Integer, String> obtenerPartidasGuardadas(String usuario) {
+        return grupoDB.obtenerPartidasGuardadas(usuario);
+    }
 }
