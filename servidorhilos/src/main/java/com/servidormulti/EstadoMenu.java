@@ -12,4 +12,5 @@ public enum EstadoMenu {
     MENU_UNIRSE_SALA,       // Esperando el nombre de la sala para unirse
     MENU_CREAR_SALA_NOMBRE, // Esperando el nombre de la sala a crear
     SALA_ACTIVA,            // El cliente está activamente chateando en una sala
+    MENU_VER_PARTIDAS_GUARDADAS, // Menú para ver partidas guardadas
 }

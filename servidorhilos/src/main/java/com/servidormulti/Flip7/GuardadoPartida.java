@@ -34,14 +34,18 @@ public class GuardadoPartida {
             // Asumimos que todos están en la misma sala, tomamos el nombre del primero
             String nombreSala = clientes.get(0).obtenerSalaActual();
 
-            try (PreparedStatement pstmt = conn.prepareStatement(sqlPartida, Statement.RETURN_GENERATED_KEYS)) {
+            // CAMBIO: Quitamos Statement.RETURN_GENERATED_KEYS para evitar el error del driver
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlPartida)) {
                 pstmt.setString(1, nombreSala);
                 pstmt.setInt(2, turnoActual);
                 pstmt.executeUpdate();
 
-                ResultSet rs = pstmt.getGeneratedKeys();
-                if (rs.next()) {
-                    partidaId = rs.getInt(1);
+                // CAMBIO: Recuperamos el ID usando la función nativa de SQLite
+                try (Statement stmt = conn.createStatement();
+                     ResultSet rs = stmt.executeQuery("SELECT last_insert_rowid()")) {
+                    if (rs.next()) {
+                        partidaId = rs.getInt(1);
+                    }
                 }
             }
 
@@ -71,7 +75,6 @@ public class GuardadoPartida {
             vista.mostrarMensajeGenerico(clientes, "¡Partida guardada exitosamente! Cerrando sala...");
 
             // 3. Gestionar la salida de los jugadores (resetear su estado visual)
-            // Hacemos copia para evitar errores de concurrencia al iterar
             List<UnCliente> copiaClientes = new ArrayList<>(clientes);
             for (UnCliente c : copiaClientes) {
                 c.getManejadorMenu().mostrarMenuSalaPrincipal(c, c.getSalida());
