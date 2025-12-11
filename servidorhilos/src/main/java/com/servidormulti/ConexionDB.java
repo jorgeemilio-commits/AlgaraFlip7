@@ -70,11 +70,30 @@ public class ConexionDB {
                                  "FOREIGN KEY (grupo_id) REFERENCES grupos(id) ON DELETE CASCADE" +
                                  ");";
 
+        // Tabla de Partidas Guardadas
+        String sqlPartidasGuardadas = "CREATE TABLE IF NOT EXISTS partidas_guardadas (" +
+                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                     "sala TEXT NOT NULL," +
+                     "turno_actual INTEGER" +
+                     ");";
+
+        // Tabla de Jugadores Guardados
+        String sqlJugadoresGuardados = "CREATE TABLE IF NOT EXISTS jugadores_guardados (" +
+                     "partida_id INTEGER," +
+                     "nombre_usuario TEXT," +
+                     "puntuacion INTEGER," +
+                     "tiene_second_chance INTEGER," + // 1 si tiene, 0 si no
+                     "cartas_mano TEXT," + 
+                     "FOREIGN KEY(partida_id) REFERENCES partidas_guardadas(id)" +
+                     ");";
+
         try (Statement stmt = conn.createStatement()) {
             stmt.execute(sqlUsuarios);
             stmt.execute(sqlGrupos);
             stmt.execute(sqlGruposMiembros);
-            System.out.println("Tablas (usuarios, grupos y miembros) verificadas.");
+            stmt.execute(sqlPartidasGuardadas);
+            stmt.execute(sqlJugadoresGuardados);
+            System.out.println("Tablas verificadas.");
         } catch (SQLException e) {
             System.err.println("Error al crear las tablas: " + e.getMessage());
         }
