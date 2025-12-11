@@ -58,11 +58,6 @@ public class SesionJuego {
 
         // --- LÓGICA DE CARGA O REINICIO ---
         String nombreSala = clientesEnSala.get(0).obtenerSalaActual();
-        // Consultamos al contexto/DB si hay una partida guardada para esta sala
-        // (Accedemos a GrupoDB a través de una referencia estática o pasando el objeto, 
-        //  aquí asumiremos que instanciamos GrupoDB localmente o lo pasamos en constructor. 
-        //  Para simplificar y mantener tu estructura, lo instanciamos aquí rápido o usamos Contexto).
-        
         com.servidormulti.GrupoDB db = new com.servidormulti.GrupoDB(); // Instancia temporal
         Integer idGuardado = db.obtenerIdPartidaPorSala(nombreSala);
 
@@ -118,6 +113,9 @@ public class SesionJuego {
                     Jugador j = jugadores.get(clienteDueño.getClienteID());
                     j.sumarPuntos(d.puntuacion); // Restaurar puntos base
                     j.setTieneSecondChance(d.secondChance);
+                    j.setTieneBUST(d.esBust);// Restaura si perdió
+                    j.setSePlanto(d.sePlanto);// Restaura si se plantó (/parar)
+                    j.setEstaCongelado(d.estaCongelado);
                     
                     // Restaurar cartas en mano
                     if (d.cartas != null && !d.cartas.isEmpty()) {
