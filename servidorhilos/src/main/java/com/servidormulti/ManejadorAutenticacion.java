@@ -19,7 +19,7 @@ public class ManejadorAutenticacion {
         // Verifica que sea un nombre válido
         if (nombre.matches("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]+")) {
             salida.writeUTF("Error: El nombre de usuario contiene caracteres no permitidos. Solo se permiten letras, números y acentos.");
-            cliente.mostrarMenuPrincipal(); 
+            cliente.getManejadorMenu().mostrarMenuPrincipal(cliente, salida);
             return;
         }
         // Guarda el nombre temporalmente y pide la contraseña

@@ -45,7 +45,7 @@ public class ManejadorSalas {
                     
                 } else if (mensaje.equals("3")) { // Cerrar sesión
                     cliente.manejarLogout(); 
-                    cliente.mostrarMenuPrincipal();
+                    cliente.getManejadorMenu().mostrarMenuPrincipal(cliente, salida);
                     
                 } else {
                     salida.writeUTF("Opción no válida. Por favor, ingresa 1, 2, o 3.");
