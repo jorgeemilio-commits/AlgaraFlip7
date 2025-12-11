@@ -45,11 +45,40 @@ public class ManejadorSalas {
                         cliente.establecerEstadoActual(EstadoMenu.MENU_CREAR_SALA_NOMBRE); 
                         salida.writeUTF("Introduce el nombre de la nueva sala (solo letras/números):");
                     }
-                    
+            
                 } else if (mensaje.equals("3")) { // Cerrar sesión
                     cliente.manejarLogout(); 
                     menu.mostrarMenuPrincipal(cliente, salida);
                     
+                } else if (mensaje.equals("4")) { // <--- AGREGA ESTE BLOQUE NUEVO
+                    if (!cliente.estaLogueado()) {
+                        salida.writeUTF("Opción no válida. Debes iniciar sesión.");
+                        menu.mostrarMenuSalaPrincipal(cliente, salida);
+                    } else {
+                        // 1. Obtener partidas
+                        Map<Integer, String> partidas = grupoDB.obtenerPartidasGuardadas(cliente.getNombreUsuario());
+                        
+                        if (partidas.isEmpty()) {
+                            salida.writeUTF("No tienes partidas guardadas pendientes.");
+                            menu.mostrarMenuSalaPrincipal(cliente, salida);
+                        } else {
+                            // 2. Mostrar lista
+                            StringBuilder sb = new StringBuilder("\n--- TUS PARTIDAS GUARDADAS ---\n");
+                            for (Map.Entry<Integer, String> p : partidas.entrySet()) {
+                                sb.append("ID: ").append(p.getKey())
+                                  .append(" | Sala: ").append(p.getValue())
+                                  .append("\n");
+                            }
+                            sb.append("--------------------------------\n");
+                            sb.append("Escribe el ID de la partida para reanudarla (o /volver):");
+                            
+                            salida.writeUTF(sb.toString());
+                            
+                            // 3. Cambiar estado para esperar el ID
+                            cliente.establecerEstadoActual(EstadoMenu.MENU_VER_PARTIDAS_GUARDADAS);
+                        }
+                    }
+
                 } else {
                     salida.writeUTF("Opción no válida. Por favor, ingresa 1, 2, o 3.");
                     menu.mostrarMenuSalaPrincipal(cliente, salida);
