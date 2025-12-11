@@ -3,12 +3,17 @@ package com.servidormulti.Flip7;
 import com.servidormulti.UnCliente;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+
+import com.servidormulti.ManejadorSalas;
 
 public class SesionJuego {
 
+    private Set<String> votosGuardar = new HashSet<>();
     private final List<UnCliente> clientesEnSala;
     private final Map<String, Jugador> jugadores; 
     private final Baraja baraja;
@@ -84,6 +89,7 @@ public class SesionJuego {
     public void procesarMensajeJuego(UnCliente remitente, String mensaje) {
         if (!juegoIniciado) return;
 
+        // 1. Si no empieza con '/', es un mensaje de chat normal
         if (!mensaje.trim().startsWith("/")) {
             vista.mostrarMensajeChat(clientesEnSala, remitente.getNombreUsuario(), mensaje);
             return;
@@ -92,13 +98,45 @@ public class SesionJuego {
         String[] partes = mensaje.trim().split("\\s+");
         String comando = partes[0].toLowerCase();
 
+        // --- COMANDO DE GUARDADO  ---
+        if (comando.equals("/guardar")) {
+            votosGuardar.add(remitente.getNombreUsuario());
+            int total = clientesEnSala.size();
+            int actuales = votosGuardar.size();
+            
+            vista.mostrarMensajeGenerico(clientesEnSala, 
+                remitente.getNombreUsuario() + " quiere GUARDAR la partida (" + actuales + "/" + total + ").");
+
+            if (actuales == total) {
+                // Instanciamos la nueva clase y llamamos al método
+                GuardadoPartida guardador = new GuardadoPartida();
+                
+                boolean guardadoExitoso = guardador.guardarYTerminar(
+                    clientesEnSala, 
+                    jugadores, 
+                    indiceTurnoActual, 
+                    vista
+                );
+
+                // Si se guardó bien, limpiamos la sesión en memoria
+                if (guardadoExitoso) {
+                    clientesEnSala.clear();
+                    juegoIniciado = false;
+                }
+            }
+            return;
+        }
+        // -----------------------------------
+
         if (comando.equals("/puntuacion")) {
             vista.mostrarReportePuntuacion(remitente, jugadores);
             return;
         }
 
+        // 2. Validación de Turno
         UnCliente clienteActual = clientesEnSala.get(indiceTurnoActual);
         boolean esTurno = remitente.getClienteID().equals(clienteActual.getClienteID());
+        // Validación especial para quien está sufriendo un "Flip Three" (puede actuar fuera de turno normal)
         boolean esVictimaFlip3 = (this.flipThreeObjetivo != null &&
                 remitente.getNombreUsuario().equalsIgnoreCase(this.flipThreeObjetivo.obtenerNombreUsuario()));
 
@@ -109,6 +147,7 @@ public class SesionJuego {
 
         Jugador jugadorActual = jugadores.get(remitente.getClienteID());
 
+        // 3. Manejo de cartas de ACCIÓN pendientes (Freeze, Flip Three, etc.)
         if (esperandoObjetivo) {
             if (comando.equals("/usar")) {
                 if (partes.length < 2) {
@@ -122,6 +161,7 @@ public class SesionJuego {
             return;
         }
 
+        // 4. Comandos de Juego normales
         switch (comando) {
             case "/jalar":
                 if (esVictimaFlip3 && !esTurno) {
@@ -135,7 +175,7 @@ public class SesionJuego {
                 accionParar(remitente, jugadorActual);
                 break;
             default:
-                vista.enviar(remitente, "Comando no válido. Usa /jalar, /parar, /puntuacion.");
+                vista.enviar(remitente, "Comando no válido. Usa /jalar, /parar, /puntuacion o /guardar.");
         }
     }
 
