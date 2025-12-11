@@ -304,7 +304,7 @@ public class ManejadorSalas {
         String mensajeInvitado = cliente.estaLogueado() ? "" : " (No puedes crear salas)";
         
         String menu = "\n" +
-                      "--- MENÚ PRINCIPAL DE SALAS - " + estado + " como: " + cliente.getNombreUsuario() + mensajeInvitado + " ---\n" +
+                      "--- MENU PRINCIPAL DE SALAS - " + estado + " como: " + cliente.getNombreUsuario() + mensajeInvitado + " ---\n" +
                       "Selecciona una opción:\n" +
                       "  1. Unirse a una Sala (Entrar a chatear)\n" +
                       "  2. Crear una Sala\n" +
