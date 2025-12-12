@@ -2,9 +2,9 @@ package com.servidormulti;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList; 
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet; 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,7 +15,7 @@ public class ManejadorSalas {
 
     private final GrupoDB grupoDB;
     private final ManejadorMensajes manejadorMensajes;
-    
+
     private final Map<String, SesionJuego> partidasActivas;
     private final Map<String, Set<String>> votosListo;
 
@@ -30,26 +30,26 @@ public class ManejadorSalas {
         ManejadorMenu menu = cliente.getManejadorMenu(); // Referencia corta para usar abajo
 
         switch (cliente.obtenerEstadoActual()) {
-            
+
             case MENU_SALA_PRINCIPAL:
                 if (mensaje.equals("1")) { // Unirse a una sala
                     // Lógica: Obtener datos -> Pasarlos a la vista
                     Map<String, Integer> salas = grupoDB.obtenerSalasDisponibles();
                     menu.mostrarSalasDisponibles(cliente, salida, salas);
-                    
+
                 } else if (mensaje.equals("2")) { // Crear una sala
-                    if (!cliente.estaLogueado()) { 
+                    if (!cliente.estaLogueado()) {
                         salida.writeUTF("Error: Solo los usuarios registrados pueden crear salas.");
                         menu.mostrarMenuSalaPrincipal(cliente, salida);
                     } else {
-                        cliente.establecerEstadoActual(EstadoMenu.MENU_CREAR_SALA_NOMBRE); 
+                        cliente.establecerEstadoActual(EstadoMenu.MENU_CREAR_SALA_NOMBRE);
                         salida.writeUTF("Introduce el nombre de la nueva sala (solo letras/números):");
                     }
-            
+
                 } else if (mensaje.equals("3")) { // Cerrar sesión
-                    cliente.manejarLogout(); 
+                    cliente.manejarLogout();
                     menu.mostrarMenuPrincipal(cliente, salida);
-                    
+
                 } else if (mensaje.equals("4")) { // <--- AGREGA ESTE BLOQUE NUEVO
                     if (!cliente.estaLogueado()) {
                         salida.writeUTF("Opción no válida. Debes iniciar sesión.");
@@ -57,7 +57,7 @@ public class ManejadorSalas {
                     } else {
                         // 1. Obtener partidas
                         Map<Integer, String> partidas = grupoDB.obtenerPartidasGuardadas(cliente.getNombreUsuario());
-                        
+
                         if (partidas.isEmpty()) {
                             salida.writeUTF("No tienes partidas guardadas pendientes.");
                             menu.mostrarMenuSalaPrincipal(cliente, salida);
@@ -66,14 +66,14 @@ public class ManejadorSalas {
                             StringBuilder sb = new StringBuilder("\n--- TUS PARTIDAS GUARDADAS ---\n");
                             for (Map.Entry<Integer, String> p : partidas.entrySet()) {
                                 sb.append("ID: ").append(p.getKey())
-                                  .append(" | Sala: ").append(p.getValue())
-                                  .append("\n");
+                                        .append(" | Sala: ").append(p.getValue())
+                                        .append("\n");
                             }
                             sb.append("--------------------------------\n");
                             sb.append("Escribe el ID de la partida para reanudarla (o /volver):");
-                            
+
                             salida.writeUTF(sb.toString());
-                            
+
                             // 3. Cambiar estado para esperar el ID
                             cliente.establecerEstadoActual(EstadoMenu.MENU_VER_PARTIDAS_GUARDADAS);
                         }
@@ -86,32 +86,32 @@ public class ManejadorSalas {
                 break;
 
             case MENU_UNIRSE_SALA:
-                if (mensaje.trim().equalsIgnoreCase("/salir")) { 
+                if (mensaje.trim().equalsIgnoreCase("/salir")) {
                     menu.mostrarMenuSalaPrincipal(cliente, salida);
                     return;
                 }
-                
-                try { 
+
+                try {
                     Map<String, Integer> salasMap = grupoDB.obtenerSalasDisponibles();
                     List<String> salasLista = new ArrayList<>(salasMap.keySet());
-                    
+
                     int indiceSeleccionado = Integer.parseInt(mensaje.trim());
-                    
+
                     if (indiceSeleccionado >= 1 && indiceSeleccionado <= salasLista.size()) {
-                        String nombreSala = salasLista.get(indiceSeleccionado - 1); 
-                        
+                        String nombreSala = salasLista.get(indiceSeleccionado - 1);
+
                         if (unirseASala(nombreSala, cliente, salida)) {
                             menu.mostrarInterfazSalaActiva(cliente, salida, nombreSala);
                         } else {
                             menu.mostrarMenuSalaPrincipal(cliente, salida);
                         }
-                    } else { 
+                    } else {
                         salida.writeUTF("Número de sala no válido. Elige un número de la lista o escribe /salir.");
                         // Reutilizamos la lógica de mostrar disponibles
                         menu.mostrarSalasDisponibles(cliente, salida, salasMap);
                     }
-                    
-                } catch (NumberFormatException e) { 
+
+                } catch (NumberFormatException e) {
                     salida.writeUTF("Entrada no válida. Debes escribir el NÚMERO de la sala.");
                     // Re-fetch para mostrar
                     menu.mostrarSalasDisponibles(cliente, salida, grupoDB.obtenerSalasDisponibles());
@@ -119,7 +119,7 @@ public class ManejadorSalas {
                 break;
 
             case MENU_CREAR_SALA_NOMBRE:
-                if (crearSala(mensaje, cliente, salida)) { 
+                if (crearSala(mensaje, cliente, salida)) {
                     menu.mostrarInterfazSalaActiva(cliente, salida, mensaje); // mensaje es el nombreSala
                 } else {
                     menu.mostrarMenuSalaPrincipal(cliente, salida);
@@ -127,11 +127,12 @@ public class ManejadorSalas {
                 break;
 
             case SALA_ACTIVA:
-                if (mensaje.trim().equalsIgnoreCase("/salir")) { 
+                if (mensaje.trim().equalsIgnoreCase("/salir")) {
                     salirDelGrupoActual(cliente);
                     menu.mostrarMenuSalaPrincipal(cliente, salida);
 
-                } else if (mensaje.trim().equalsIgnoreCase("/jugadores") || mensaje.trim().equalsIgnoreCase("/miembros")) {
+                } else if (mensaje.trim().equalsIgnoreCase("/jugadores")
+                        || mensaje.trim().equalsIgnoreCase("/miembros")) {
                     // Lógica para preparar datos de jugadores
                     String nombreSala = cliente.obtenerSalaActual();
                     if (nombreSala != null) {
@@ -148,8 +149,8 @@ public class ManejadorSalas {
 
                 } else {
                     String nombreSala = cliente.obtenerSalaActual();
-                    if (nombreSala != null) {  
-                        
+                    if (nombreSala != null) {
+
                         SesionJuego juegoActual = partidasActivas.get(nombreSala);
 
                         if (juegoActual != null && juegoActual.estaJuegoIniciado()) {
@@ -188,10 +189,11 @@ public class ManejadorSalas {
             cliente.getSalida().writeUTF("Ya estás marcado como listo. Esperando a los demás...");
             return;
         }
-        
+
         listos.add(cliente.getNombreUsuario());
-        
-        String msgAviso = "#" + nombreSala + " El jugador " + cliente.getNombreUsuario() + " está LISTO (" + listos.size() + "/3 necesarios).";
+
+        String msgAviso = "#" + nombreSala + " El jugador " + cliente.getNombreUsuario() + " está LISTO ("
+                + listos.size() + "/3 necesarios).";
         manejadorMensajes.enrutarMensaje(cliente, msgAviso);
 
         if (listos.size() >= 3) {
@@ -208,25 +210,27 @@ public class ManejadorSalas {
             cliente.getSalida().writeUTF("No estabas marcado como listo.");
             return;
         }
-        
+
         listos.remove(cliente.getNombreUsuario());
-        
-        String msgAviso = "#" + nombreSala + " El jugador " + cliente.getNombreUsuario() + " ya NO está listo (" + listos.size() + "/3 necesarios).";
+
+        String msgAviso = "#" + nombreSala + " El jugador " + cliente.getNombreUsuario() + " ya NO está listo ("
+                + listos.size() + "/3 necesarios).";
         manejadorMensajes.enrutarMensaje(cliente, msgAviso);
-        
+
         cliente.getSalida().writeUTF("Has cancelado tu voto de listo.");
     }
 
     // Inicia la partida en la sala especificada
     private void iniciarPartidaEnSala(String nombreSala) {
         Integer grupoId = grupoDB.getGrupoId(nombreSala);
-        if (grupoId == null) return;
+        if (grupoId == null)
+            return;
 
         List<String> nombresMiembros = grupoDB.getMiembrosGrupo(grupoId);
         List<UnCliente> jugadoresConectados = new ArrayList<>();
 
         for (String nombre : nombresMiembros) {
-            UnCliente c = ServidorMulti.buscarClientePorNombre(nombre); 
+            UnCliente c = ServidorMulti.buscarClientePorNombre(nombre);
             if (c != null && nombreSala.equals(c.obtenerSalaActual())) {
                 jugadoresConectados.add(c);
             }
@@ -239,22 +243,22 @@ public class ManejadorSalas {
     }
 
     // Lógica para salir del grupo/sala actual
-    public void salirDelGrupoActual(UnCliente cliente) { 
+    public void salirDelGrupoActual(UnCliente cliente) {
         String sala = cliente.obtenerSalaActual();
         if (sala != null) {
             grupoDB.salirGrupo(sala, cliente.getNombreUsuario());
-            
+
             if (votosListo.containsKey(sala)) {
                 votosListo.get(sala).remove(cliente.getNombreUsuario());
             }
 
             SesionJuego juego = partidasActivas.get(sala);
             if (juego != null) {
-               juego.removerJugador(cliente);
+                juego.removerJugador(cliente);
 
-               if (grupoDB.obtenerSalasDisponibles().get(sala) == null) {
-                   partidasActivas.remove(sala);
-               }
+                if (grupoDB.obtenerSalasDisponibles().get(sala) == null) {
+                    partidasActivas.remove(sala);
+                }
             }
 
             cliente.establecerSalaActual(null);
@@ -265,12 +269,12 @@ public class ManejadorSalas {
     // Lógica para unirse a una sala
     public boolean unirseASala(String nombreSala, UnCliente cliente, DataOutputStream salida) throws IOException {
         String resultado = grupoDB.unirseGrupo(nombreSala, cliente.getNombreUsuario());
-        
+
         if (resultado.contains("Error") || resultado.contains("no existe")) {
             salida.writeUTF(resultado + " Intenta de nuevo.");
             return false;
         }
-        
+
         cliente.establecerSalaActual(nombreSala);
         salida.writeUTF(resultado + " ¡Has entrado a la sala!");
         return true;
@@ -280,6 +284,17 @@ public class ManejadorSalas {
     private boolean crearSala(String nombreSala, UnCliente cliente, DataOutputStream salida) throws IOException {
         if (!nombreSala.matches("[a-zA-Z0-9]+")) {
             salida.writeUTF("Error: El nombre de la sala solo puede contener letras y números.");
+            return false;
+        }
+
+        String nombreSalaMinusculas = nombreSala.toLowerCase();
+
+        if (nombreSalaMinusculas.contains("/")) {
+            salida.writeUTF("Error: El nombre de la sala no puede contener el símbolo de comando (/).");
+            return false;
+        }
+        if (nombreSalaMinusculas.equals("sala")) {
+            salida.writeUTF("Error: 'Sala' es un nombre reservado y no se puede usar.");
             return false;
         }
 
