@@ -13,6 +13,8 @@ public class ServidorMulti {
 
     public static void main(String[] args) throws IOException {
         
+        ConexionDB.inicializar();
+        
         ContextoServidor contexto = new ContextoServidor(clientes);
         System.out.println("Servicios del servidor inicializados.");
         
@@ -32,5 +34,13 @@ public class ServidorMulti {
         } catch (IOException e) {
             System.err.println("Error al iniciar el servidor: " + e.getMessage());
         }
+    }
+    public static UnCliente buscarClientePorNombre(String nombre) {
+        for (UnCliente c : clientes.values()) {
+            if (c.getNombreUsuario().equalsIgnoreCase(nombre)) {
+                return c;
+            }
+        }
+        return null;
     }
 }

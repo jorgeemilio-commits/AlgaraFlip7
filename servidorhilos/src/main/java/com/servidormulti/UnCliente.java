@@ -8,8 +8,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class UnCliente implements Runnable {
     
@@ -17,18 +15,18 @@ public class UnCliente implements Runnable {
     final DataInputStream entrada;
     final String clienteID; 
     
-    private final ManejadorMensajes manejadorMensajes;
-    private final EnrutadorComandos enrutadorComandos; 
-    
-    private static final int LIMITE_MENSAJES_INVITADO = 3;
+    // Referencias a los manejadores
+    private final ManejadorSalas manejadorSalas; 
+    private final ManejadorMenu manejadorMenu; // Nueva referencia
     
     private String nombreUsuario; 
-    private int mensajesEnviados = 0;
     private boolean logueado = false;
 
-    private volatile String oponentePendiente = null;
-    private final ConcurrentHashMap<String, Object> juegosActivos = new ConcurrentHashMap<>();
-    
+    private EstadoMenu estadoActual = EstadoMenu.MENU_PRINCIPAL; 
+    private String nombreTemporal = null;
+    private String contrasenaTemporal = null;
+    private String salaActual = null;
+
     private final PrintWriter salidaUTF;
     private final BufferedReader entradaUTF;
     
@@ -41,119 +39,101 @@ public class UnCliente implements Runnable {
         this.salida = new DataOutputStream(s.getOutputStream());
         this.entrada = new DataInputStream(s.getInputStream());
 
-        this.manejadorMensajes = contexto.getManejadorMensajes();
-        this.enrutadorComandos = contexto.getEnrutadorComandos();
+        // Obtenemos los manejadores del contexto
+        this.manejadorSalas = contexto.getManejadorSalas();
+        this.manejadorMenu = contexto.getManejadorMenu();
     }
 
+    // --- Métodos de Estado y Datos Temporales ---
+    public synchronized EstadoMenu obtenerEstadoActual() { return estadoActual; }
+    public synchronized void establecerEstadoActual(EstadoMenu estado) { this.estadoActual = estado; }
+    public synchronized String obtenerNombreTemporal() { return nombreTemporal; }
+    public synchronized void establecerNombreTemporal(String nombre) { this.nombreTemporal = nombre; }
+    public synchronized String obtenerContrasenaTemporal() { return contrasenaTemporal; }
+    public synchronized void establecerContrasenaTemporal(String password) { this.contrasenaTemporal = password; }
+    public synchronized void limpiarTemporales() { 
+        this.nombreTemporal = null; 
+        this.contrasenaTemporal = null;
+    }
+    public synchronized String obtenerSalaActual() { return salaActual; }
+    public synchronized void establecerSalaActual(String sala) { this.salaActual = sala; }
+    
     public String getNombreUsuario() { return nombreUsuario; }
-    public int getMensajesEnviados() { return mensajesEnviados; }
-    public void incrementarMensajesEnviados() { this.mensajesEnviados++; }
     public boolean estaLogueado() { return logueado; }
-    public synchronized String getOponentePendiente() { return oponentePendiente; }
-    public synchronized void setOponentePendiente(String nombre) { this.oponentePendiente = nombre; }
-    public synchronized Object getJuegoConID(String juegoID) { return juegosActivos.get(juegoID); }
-    public synchronized void agregarJuego(String juegoID, Object juego) { juegosActivos.put(juegoID, juego); }
-    public synchronized void removerJuego(String juegoID) { juegosActivos.remove(juegoID); }
-    public synchronized boolean estaEnJuego() { return !this.juegosActivos.isEmpty(); }
-    @SuppressWarnings("unchecked")
-    public synchronized ConcurrentHashMap<String, Object> getJuegosActivos() { return (ConcurrentHashMap<String, Object>) juegosActivos; }
     
-    
-    /**
-     * Aplica el estado de login y une al usuario al grupo 'Todos'.
-     * @param nombre El nombre de usuario.
-     * @param password La contraseña.
-     * @return true si el login interno fue exitoso.
-     * @throws IOException 
-     */
+    // --- Manejo Interno de Login/Logout ---
     public boolean manejarLoginInterno(String nombre, String password) throws IOException {
-        
         try {
             this.nombreUsuario = nombre; 
             this.logueado = true;
-            
-            // Esta línea ahora debería funcionar si GrupoDB.unirseGrupo existe.
-            new GrupoDB().unirseGrupo("Todos", nombre); 
-            
             return true;
-
         } catch (Exception e) {
-            System.err.println("Error en la fase final de login para " + nombre + ": " + e.getMessage());
+            System.err.println("Error en login interno: " + e.getMessage());
             this.logueado = false;
             this.nombreUsuario = "Invitado-" + this.clienteID;
             return false;
         }
     }
     
+    // Manejo Externo de Logout
     public void manejarLogoutInterno() {
         if (this.logueado) {
+            manejadorSalas.salirDelGrupoActual(this);
             this.logueado = false;
             this.nombreUsuario = "Invitado-" + this.clienteID; 
-            this.mensajesEnviados = 0;
         }
     }
     
+    // Manejo Externo de Logout con Mensaje
+    public void manejarLogout() throws IOException {
+        manejarLogoutInterno();
+        this.salida.writeUTF("Has cerrado sesión. Tu nombre es ahora '" + this.getNombreUsuario() + "'.");
+    }
+
     @Override
     public void run() {
         try {
-            this.salida.writeUTF("Bienvenido. Tu nombre actual es: " + this.nombreUsuario + "\n" +
-                                 "--- Comandos Básicos ---\n" +
-                                 "  Mensaje a 'Todos': Hola a todos\n" +
-                                 "  Mensaje a Grupo:   #NombreGrupo Hola grupo (Solo logueado)\n" +
-                                 "  /login             - Inicia sesión\n" +
-                                 "  /registrar         - Crea una nueva cuenta\n" +
-                                 "--- Para más comandos, escribe: /ayuda ---");
-
+            // Delegamos al ManejadorMenu mostrar el menú inicial
+            manejadorMenu.mostrarMenuPrincipal(this, salida); 
         } catch (IOException e) { System.err.println("Error de bienvenida: " + e.getMessage()); }
 
         while (true) {
             try {
+                // Lee el mensaje del cliente
                 String mensaje = entrada.readUTF();
 
-                if (mensaje.startsWith("/")) {
-                    
-                    if (!this.logueado) {
-                        String comando = mensaje.trim().split(" ", 2)[0].toLowerCase();
-
-                        boolean esComandoExcluido = comando.equals("/login") || 
-                                                    comando.equals("/registrar") ||
-                                                    comando.equals("/ayuda") ||
-                                                    comando.equals("/conectados");
-
-                        if (!esComandoExcluido) {
-                            if (this.mensajesEnviados >= LIMITE_MENSAJES_INVITADO) {
-                                this.salida.writeUTF("Límite de acciones alcanzado. Por favor, inicia sesión para continuar con /login o /register.");
-                                continue;
-                            }
-                            this.incrementarMensajesEnviados();
-                        }
-                    }
-                    
-                    enrutadorComandos.procesar(mensaje, entrada, salida, this);
-
+                // Delegamos la lógica de decisión al ManejadorMenu
+                if (manejadorMenu.esEstadoDeSalas(estadoActual)) {
+                    manejadorSalas.procesar(mensaje, this, salida);
                 } else {
-                    
-                    if (!this.logueado) {
-                        if (this.mensajesEnviados >= LIMITE_MENSAJES_INVITADO) {
-                            this.salida.writeUTF("Límite de mensajes alcanzado. Por favor, inicia sesión.");
-                            continue;
-                        }
-                        this.incrementarMensajesEnviados();
-                    }
-                    
-                    manejadorMensajes.enrutarMensaje(this, mensaje);
+                    // Si no es sala, es lógica de menú/auth
+                    manejadorMenu.procesar(mensaje, this, salida);
                 }
                 
-            } catch (Exception ex) {
+            } catch (Exception ex) { // El cliente se ha desconectado o hubo un error
                 System.out.println("Cliente " + this.nombreUsuario + " se ha desconectado.");
-                
-                ServidorMulti.clientes.remove(this.clienteID); 
+                if (this.salaActual != null) {
+                    manejadorSalas.salirDelGrupoActual(this);
+                }
+                ServidorMulti.clientes.remove(this.clienteID); // Elimina al cliente de la lista activa
                 try {
                     this.entrada.close();
                     this.salida.close();
-                } catch (IOException e) { e.printStackTrace(); }
+                } catch (IOException e) { e.printStackTrace(); } // Cierra flujos
                 break;
             }
         }
+    }
+    
+    public String getClienteID() {
+        return this.clienteID;
+    }
+
+    public DataOutputStream getSalida() {
+        return this.salida;
+    }
+
+    public ManejadorMenu getManejadorMenu() {
+        return this.manejadorMenu;
     }
 }

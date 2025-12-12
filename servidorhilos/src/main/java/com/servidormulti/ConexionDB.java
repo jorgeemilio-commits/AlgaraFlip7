@@ -11,6 +11,9 @@ public class ConexionDB {
 
     private static final String URL = "jdbc:sqlite:usuarios.db";
 
+    /*
+     * Obtiene la conexión de la base de datos.
+     */
     public static Connection conectar() {
         Connection conn = null;
         try {
@@ -21,16 +24,27 @@ public class ConexionDB {
             
             conn = DriverManager.getConnection(URL, config.toProperties());
             
-            crearTablas(conn); 
-            inicializarDatosBase(conn); // Mantiene la creación del grupo "Todos"
-
         } catch (ClassNotFoundException e) {
             System.err.println("Error: Driver JDBC de SQLite no encontrado.");
             e.printStackTrace();
         } catch (SQLException e) {
-            System.err.println("Error al conectar o crear la base de datos: " + e.getMessage());
+            System.err.println("Error de conexión: " + e.getMessage());
         }
         return conn;
+    }
+
+    /**
+     * Método para inicializar la BD.
+     */
+    public static void inicializar() {
+        try (Connection conn = conectar()) {
+            if (conn != null) {
+                crearTablas(conn);
+                inicializarDatosBase(conn); // Aquí se limpian las salas viejas
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     private static void crearTablas(Connection conn) {
@@ -56,37 +70,70 @@ public class ConexionDB {
                                  "FOREIGN KEY (grupo_id) REFERENCES grupos(id) ON DELETE CASCADE" +
                                  ");";
 
+        // Tabla de Partidas Guardadas
+        String sqlPartidasGuardadas = "CREATE TABLE IF NOT EXISTS partidas_guardadas (" +
+                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                     "sala TEXT NOT NULL," +
+                     "turno_actual INTEGER" +
+                     ");";
+
+        // Tabla de Jugadores Guardados
+        String sqlJugadoresGuardados = "CREATE TABLE IF NOT EXISTS jugadores_guardados (" +
+                     "partida_id INTEGER," +
+                     "nombre_usuario TEXT," +
+                     "puntuacion INTEGER," +
+                     "tiene_second_chance INTEGER," + // 1 si tiene, 0 si no
+                     "cartas_mano TEXT," + 
+                     "es_bust INTEGER," +
+                     "se_planto INTEGER," +
+                     "esta_congelado INTEGER," +
+                     "FOREIGN KEY(partida_id) REFERENCES partidas_guardadas(id)" +
+                     ");";
+
         try (Statement stmt = conn.createStatement()) {
-            
             stmt.execute(sqlUsuarios);
             stmt.execute(sqlGrupos);
             stmt.execute(sqlGruposMiembros);
-            
-            System.out.println("Tablas (usuarios, grupos y miembros) verificadas o creadas.");
+            stmt.execute(sqlPartidasGuardadas);
+            stmt.execute(sqlJugadoresGuardados);
+            System.out.println("Tablas verificadas.");
         } catch (SQLException e) {
             System.err.println("Error al crear las tablas: " + e.getMessage());
         }
     }
 
     /**
-     * Asegura que el grupo "Todos" exista.
+     * Inicializa datos y limpia basura de ejecuciones anteriores.
      */
     private static void inicializarDatosBase(Connection conn) {
+        // 1. Limpiar grupos basura de ejecuciones anteriores (respetando 'Todos')
+        String sqlLimpiar = "DELETE FROM grupos WHERE nombre <> 'Todos'";
+        
+        // 2. Verificar o crear el grupo base 'Todos'
         String sqlCheck = "SELECT COUNT(*) FROM grupos WHERE nombre = ?";
         String sqlInsert = "INSERT INTO grupos (nombre) VALUES (?)";
 
-        try (PreparedStatement checkStmt = conn.prepareStatement(sqlCheck)) {
-            checkStmt.setString(1, "Todos");
-            ResultSet rs = checkStmt.executeQuery();
-            if (rs.next() && rs.getInt(1) == 0) {
-                try (PreparedStatement insertStmt = conn.prepareStatement(sqlInsert)) {
-                    insertStmt.setString(1, "Todos");
-                    insertStmt.executeUpdate();
-                    System.out.println("Grupo 'Todos' inicializado en la base de datos.");
+        try (Statement stmt = conn.createStatement()) {
+            // Ejecutamos la limpieza
+            int borrados = stmt.executeUpdate(sqlLimpiar);
+            if (borrados > 0) {
+                System.out.println("Se limpiaron " + borrados + " salas antiguas de la base de datos.");
+            }
+
+            // Verificamos 'Todos'
+            try (PreparedStatement checkStmt = conn.prepareStatement(sqlCheck)) {
+                checkStmt.setString(1, "Todos");
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next() && rs.getInt(1) == 0) {
+                    try (PreparedStatement insertStmt = conn.prepareStatement(sqlInsert)) {
+                        insertStmt.setString(1, "Todos");
+                        insertStmt.executeUpdate();
+                        System.out.println("Grupo 'Todos' inicializado.");
+                    }
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al inicializar datos base (Grupo 'Todos'): " + e.getMessage());
+            System.err.println("Error al inicializar datos base: " + e.getMessage());
         }
     }
 

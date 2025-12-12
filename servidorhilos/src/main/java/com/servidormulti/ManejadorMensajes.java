@@ -14,7 +14,6 @@ public class ManejadorMensajes {
 
     private final Map<String, UnCliente> clientesConectados;
     private final GrupoDB grupoDB;
-    // [ELIMINADO: MensajeDB y BloqueoDB]
 
     public ManejadorMensajes(Map<String, UnCliente> clientes, GrupoDB gdb) {
         this.clientesConectados = clientes;
@@ -50,14 +49,7 @@ public class ManejadorMensajes {
             manejarMensajeGrupo(remitente, nombreGrupo, contenido);
             return;
         }
-
-        // [ELIMINADO: MENSAJE PRIVADO (@usuario ...)]
-        if (mensaje.startsWith("@")) {
-            remitente.salida.writeUTF("Los mensajes privados están desactivados en esta versión.");
-            return;
-        }
-        
-        // --- 3. MENSAJE GENERAL A TODOS (Por defecto) ---
+        // --- 2. MENSAJE GENERAL A 'Todos' ---
         manejarMensajeGrupo(remitente, "Todos", mensaje);
     }
 
@@ -71,7 +63,6 @@ public class ManejadorMensajes {
             return;
         }
         
-        // [ELIMINADO: Lógica de guardar mensaje en DB]
 
         List<String> miembros;
         
@@ -85,24 +76,19 @@ public class ManejadorMensajes {
         
         String msgFormateado = String.format("<%s> %s: %s", nombreGrupo, nombreRemitente, contenido);
         
-        // 2. Broadcast a los miembros *conectados*
+        // 2. Se envia a los miembros 
         for (String identificadorMiembro : miembros) {
             UnCliente clienteDestino = buscarClienteConectado(identificadorMiembro);
             
             // Si el cliente está conectado y no es el remitente
             if (clienteDestino != null && !clienteDestino.clienteID.equals(remitente.clienteID)) {
-                
-                // [ELIMINADO: BloqueoDB check]
-                
                 clienteDestino.salida.writeUTF(msgFormateado);
-                
-                // [ELIMINADO: Lógica de actualizar estado/mensajes vistos]
             }
         }
         
-        // Confirmar el envío (mostrando el mensaje al remitente)
+        /* Confirmar el envío (mostrando el mensaje al remitente)
         remitente.salida.writeUTF(msgFormateado); 
+        */
     }
     
-    // [ELIMINADO: manejarMensajePrivado]
 }

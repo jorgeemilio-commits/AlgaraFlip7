@@ -5,7 +5,7 @@ import java.net.Socket;
 import java.net.ConnectException;
 
 public class ClienteMulti {
-    
+
     public static void main(String[] args) {
         String host = "localhost";
         int puerto = 8081;
@@ -53,9 +53,12 @@ public class ClienteMulti {
                 // No importa cómo salimos del 'try', la conexión está muerta.
                 // Nos aseguramos de cerrar el socket (si es que existe).
                 if (s != null) {
-                    try { s.close(); } catch (IOException e) { /* ign */ }
+                    try {
+                        s.close();
+                    } catch (IOException e) {
+                        /* ign */ }
                 }
-                
+
                 // --- 5. ESPERAR Y REINTENTAR ---
                 try {
                     System.out.println("Reintentando en " + (tiempoEspera / 1000) + " segundos...");

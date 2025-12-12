@@ -2,35 +2,22 @@ package com.servidormulti;
 
 import java.util.Map;
 
-// Se eliminan las referencias a ManejadorRangos, ManejadorJuegos, ManejadorAutenticacion, ManejadorSincronizacion, ManejadorAccionesGrupo, BloqueoDB, MensajeDB
-
 public class ContextoServidor {
 
-    // --- CAMPOS PRIVADOS ---
-    
     private final Map<String, UnCliente> clientesConectados; 
 
-    // Instancias Únicas de Servicios (Singleton)
+    // Instancias Únicas
     private final GrupoDB grupoDB;
-    // [ELIMINADO: MensajeDB, BloqueoDB, ManejadorJuegos, ManejadorSincronizacion, ManejadorAccionesGrupo, ManejadorRangos, ManejadorWinrate]
-    
-    private final ManejadorComandos manejadorComandos;
     private final ManejadorAutenticacion manejadorAutenticacion;
     private final ManejadorMensajes manejadorMensajes;
-    private final EnrutadorComandos enrutadorComandos;
+    private final ManejadorSalas manejadorSalas;
+    // Nueva instancia
+    private final ManejadorMenu manejadorMenu; 
 
     public ContextoServidor(Map<String, UnCliente> clientesConectados) {
         this.clientesConectados = clientesConectados; 
 
-        // 1. Inicializar objetos DB
         this.grupoDB = new GrupoDB();
-
-        // 2. Inicializar manejadores principales
-        this.manejadorComandos = new ManejadorComandos(
-            this.grupoDB, 
-            clientesConectados 
-        );
-       
         this.manejadorAutenticacion = new ManejadorAutenticacion(clientesConectados); 
     
         this.manejadorMensajes = new ManejadorMensajes(
@@ -38,16 +25,14 @@ public class ContextoServidor {
             this.grupoDB
         );
         
-        // 3. Inicializar el enrutador
-        this.enrutadorComandos = new EnrutadorComandos(
-            this.manejadorComandos, 
-            this.manejadorAutenticacion
-        );
+        this.manejadorSalas = new ManejadorSalas(this.grupoDB, this.manejadorMensajes);
+
+        this.manejadorMenu = new ManejadorMenu(this.manejadorAutenticacion, this.manejadorSalas, this.grupoDB);
     }
 
-    // --- Getters ---
-
     public ManejadorMensajes getManejadorMensajes() { return manejadorMensajes; }
-    // [ELIMINADO: getManejadorSincronizacion]
-    public EnrutadorComandos getEnrutadorComandos() { return enrutadorComandos; }
+    public ManejadorAutenticacion getManejadorAutenticacion() { return manejadorAutenticacion; }
+    public GrupoDB getGrupoDB() { return grupoDB; }
+    public ManejadorSalas getManejadorSalas() { return manejadorSalas; } 
+    public ManejadorMenu getManejadorMenu() { return manejadorMenu; }
 }
